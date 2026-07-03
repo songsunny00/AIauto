@@ -1,0 +1,53 @@
+module:
+  path_code: "CONFIG/REPORTCFG/TYPECFG"
+  path_name: "配置中心/报告配置/报告类别配置"
+  leaf_code: "TYPECFG"
+  leaf_name: "报告类别配置"
+  owner: "{模块负责人}"
+  current_version: "V1.0.0"
+
+status:
+  lifecycle: "baselined"
+  last_updated: "2026-07-01"
+
+allowed_lifecycle:
+  - draft
+  - baselined
+  - designed
+  - developing
+  - testing
+  - released
+  - archived
+
+documents:
+  requirement: "01-需求文档.md"
+  incrementals: []
+  data_flow: "01b-数据流转设计.md"
+  prototype: "01c-原型文档.md"
+  detailed_design: "02-详细设计文档.md"
+  backend_design: "02b-后台文档.md"
+  frontend_design: "02c-前端文档.md"
+  test_cases: "03-测试用例文档.md"
+
+requirements:
+  - req_id: "REQ-CONFIG-REPORTCFG-TYPECFG-001"
+    req_title: "{功能名称}"
+    req_type: "新增"
+    introduced_in: "V1.0.0"
+    changed_in: "V1.0.0"
+    current_status: "已确认"
+    acceptance_ids:
+      - "A01"
+    code_refs:
+      - "Codes/frontend/src/views/{module}/index.vue"
+      - "Codes/backend/src/main/java/{module}/{service}.java"
+    test_refs:
+      - "Tests/ui/{module}/specs/ATS-CONFIG-REPORTCFG-TYPECFG-001.spec.ts"
+      - "Tests/api/{module}/specs/ATS-CONFIG-REPORTCFG-TYPECFG-001.api.spec.ts"
+
+backwrite_records:
+  - version: "V1.0.1"
+    source: "01a-增量需求文档.md"
+    target: "01-需求文档.md"
+    change_summary: "{回写摘要}"
+    finished_at: "2026-07-01"

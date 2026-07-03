@@ -1,0 +1,44 @@
+module:
+  path_code: "CONFIG/REPORTCFG/TYPECFG"
+  trace_file: "TRACE.yaml"
+
+repo_registry:
+  frontend: "repos/frontend-repo"
+  backend: "repos/backend-repo"
+
+mappings:
+  - req_id: "REQ-CONFIG-REPORTCFG-TYPECFG-001"
+    req_title: "{功能名称}"
+    repo_refs:
+      - repo: "repos/frontend-repo"
+        scope: "frontend"
+        pr: "frontend-repo#{PR_NUMBER}"
+        commit: "{commitSha}"
+        tag: "{tagName}"
+      - repo: "repos/backend-repo"
+        scope: "backend"
+        pr: "backend-repo#{PR_NUMBER}"
+        commit: "{commitSha}"
+        tag: "{tagName}"
+    pages:
+      - repo: "repos/frontend-repo"
+        logical_path: "Codes/frontend/src/views/{module}/index.vue"
+        repo_path: "src/views/{module}/index.vue"
+        note: "页面入口"
+    components:
+      - repo: "repos/frontend-repo"
+        logical_path: "Codes/frontend/src/components/{module}/{component}.vue"
+        repo_path: "src/components/{module}/{component}.vue"
+        note: "页面组件或弹窗组件"
+    apis:
+      - repo: "repos/backend-repo"
+        name: "{apiName}"
+        method: "GET"
+        path: "/api/v1/{path}"
+        logical_path: "Codes/backend/src/main/java/{module}/{controller}.java"
+        repo_path: "src/main/java/{module}/{controller}.java"
+    services:
+      - repo: "repos/backend-repo"
+        logical_path: "Codes/backend/src/main/java/{module}/{service}.java"
+        repo_path: "src/main/java/{module}/{service}.java"
+        note: "后端服务实现"
