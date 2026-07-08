@@ -396,7 +396,7 @@ repos/test-repo
 ```text
 Prds/
 ├─ V1.5.4.1/
-│  ├─ 01a-增量需求文档.md
+│  ├─ 01-需求文档.md
 │  ├─ 04-测试执行记录.md
 │  └─ 05-变更记录.md
 └─ CONFIG-配置中心/
@@ -869,7 +869,7 @@ AI 不应直接做：
   ↓
 形成 01-需求文档.md 与 REQ 编号
   ↓
-按需补 01a / 01b / 01c
+按需补 01b / 01c
   ↓
 完成 02-详细设计文档.md
   ↓
@@ -983,6 +983,31 @@ AI 不应直接做：
 3. UI/API 自动化骨架生成能力
 4. 失败分类与回填建议能力
 5. 页面探索与接口分析能力
+
+第一批先补范围：
+
+- `skills/requirement-doc-bootstrap/`
+- `skills/requirement-analysis/`
+- `skills/testcase-generation/`
+- `skills/ui-automation-bootstrap/`
+- `skills/api-automation-bootstrap/`
+
+这些能力优先解决：
+
+- 从原始需求材料整理出可进入 `01-需求文档.md` 的初稿输入
+- 从 `01/02` 提取 `REQ`
+- 生成 `03` 的测试点结构
+- 输出 UI 自动化骨架
+- 输出 API 自动化骨架
+
+延后到后续批次的能力：
+
+- `prototype-to-testpoint`
+- `requirement-to-task`
+- `ui-failure-analysis`
+- `traceability-audit`
+
+原则：先把“需求解析 → 测试点生成 → UI/API 自动化起步”这条链路跑通，再逐步增强失败分析、追踪审计和更细的任务拆解能力。
 
 ### 14.3 阶段三：规模化与持续回归
 

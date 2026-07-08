@@ -47,7 +47,7 @@ requirements:
 
 backwrite_records:
   - version: "V1.0.1"
-    source: "01a-增量需求文档.md"
+    source: "V1.0.1/01-需求文档.md"
     target: "01-需求文档.md"
     change_summary: "{回写摘要}"
     finished_at: "2026-07-01"
