@@ -7,17 +7,16 @@ module:
   current_version: "V1.0.0"
 
 status:
-  lifecycle: "baselined"
+  lifecycle: "需求中"
   last_updated: "2026-07-01"
 
 allowed_lifecycle:
-  - draft
-  - baselined
-  - designed
-  - developing
-  - testing
-  - released
-  - archived
+  - 需求中
+  - 已交接需求
+  - 开发中
+  - 测试中
+  - 已发布
+  - 已归档
 
 documents:
   requirement: "01-需求文档.md"

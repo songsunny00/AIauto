@@ -30,7 +30,9 @@ skills/
 │  └─ SKILL.md
 ├─ ui-automation-bootstrap/
 │  └─ SKILL.md
-└─ api-automation-bootstrap/
+├─ api-automation-bootstrap/
+│  └─ SKILL.md
+└─ prd-git-commit/
    └─ SKILL.md
 ```
 
@@ -62,9 +64,17 @@ skills/
 - 输入：`02/03`、接口信息
 - 输出：API 自动化目录结构、README 要点、spec/client/fixture/data/schema 骨架建议
 
+### 3.6 prd-git-commit
+
+- 输入：自然语言指令（如"提交需求""更新PRD""更新文档"）+ `Prds/` 目录下的文档变更
+- 输出：Git 暂存-提交-推送结果；涉及 `01-需求文档` 变更时自动更新 `05-变更记录.md` 并通过钉钉 Webhook 通知开发与测试同事
+- 规则：按文件精确暂存（禁止 `git add .`）；变更记录只追加不修改；`REQ` 编号不自造；Webhook 配置从 `.env` 读取（参考 `.env.example`）
+
 ## 4. 当前边界
 
-本批次只补第一批最小闭环 skills，不补：
+第一批最小闭环 skills 为 3.1~3.5。`prd-git-commit`（3.6）为面向产品角色的 Git 文档管理补充技能，服务于需求变更后的提交、留痕与通知一体化流程。
+
+本批次不补：
 
 - `prototype-to-testpoint`
 - `requirement-to-task`
