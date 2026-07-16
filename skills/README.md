@@ -30,6 +30,8 @@ skills/
 │  └─ SKILL.md
 ├─ ui-automation-bootstrap/
 │  └─ SKILL.md
+├─ playwright-test-implementation/
+│  └─ SKILL.md
 ├─ api-automation-bootstrap/
 │  └─ SKILL.md
 └─ prd-git-commit/
@@ -58,13 +60,20 @@ skills/
 
 - 输入：`03`、可选 `01c`
 - 输出：UI 自动化目录结构、README 要点、spec/page/fixture/data 骨架建议
+- 边界：只负责骨架、拆分、命名、优先级与可测性建议，不负责完整 Playwright 脚本实现
 
-### 3.5 api-automation-bootstrap
+### 3.5 playwright-test-implementation
+
+- 输入：`03`、相关前端代码、既有 `Tests/ui/...` 目录、失败工件（如 `junit.xml` / `error-context.md` / `trace.zip`）
+- 输出：真实可执行的 Playwright 脚本代码、版本迭代修改方案、失败修复约束与回归建议
+- 边界：负责具体 `spec/page/fixture/data/config` 实现与维护；涉及新模块时通常在 `ui-automation-bootstrap` 之后使用
+
+### 3.6 api-automation-bootstrap
 
 - 输入：`02/03`、接口信息
 - 输出：API 自动化目录结构、README 要点、spec/client/fixture/data/schema 骨架建议
 
-### 3.6 prd-git-commit
+### 3.7 prd-git-commit
 
 - 输入：自然语言指令（如"提交需求""更新PRD""更新文档"）+ `Prds/` 目录下的文档变更
 - 输出：Git 暂存-提交-推送结果；涉及 `01-需求文档` 变更时自动更新 `05-变更记录.md` 并通过钉钉 Webhook 通知开发与测试同事
@@ -72,7 +81,12 @@ skills/
 
 ## 4. 当前边界
 
-第一批最小闭环 skills 为 3.1~3.5。`prd-git-commit`（3.6）为面向产品角色的 Git 文档管理补充技能，服务于需求变更后的提交、留痕与通知一体化流程。
+第一批最小闭环 skills 为 3.1~3.6。`prd-git-commit`（3.7）为面向产品角色的 Git 文档管理补充技能，服务于需求变更后的提交、留痕与通知一体化流程。
+
+本批次中，UI 自动化拆分为两层：
+
+- `ui-automation-bootstrap`：负责骨架、目录、README、命名与优先级建议
+- `playwright-test-implementation`：负责真实脚本生成、版本迭代修改、失败修复与回归约束
 
 本批次不补：
 
