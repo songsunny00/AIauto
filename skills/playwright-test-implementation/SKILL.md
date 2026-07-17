@@ -29,7 +29,7 @@ allowed-tools: Read Glob Grep Edit Write Bash
 开始写或改脚本前，先确认：
 
 1. 当前任务属于哪一类：**新模块起步 / 版本迭代 / 失败修复**。
-2. 是否已有可复用目录、`playwright.config.ts`、`global-setup.ts`、`.auth`、`fixtures`。
+2. 是否已有可复用目录，以及共享层 `Tests/ui/playwright.config.ts`、`Tests/ui/global-setup.ts`、`Tests/ui/.auth/` 与模块级 `fixtures`。
 3. 是否已经查看测试页面与系统实际数据；**不要凭空编造机构名、项目名、产品名、状态值、合同编号**。
 4. 需求/详设/后端文案若已明确，文案断言是否应按**完整文案精确匹配**，而不是关键词包含。
 5. 前置数据或权限是否真的不存在；`test.skip(reason)` 应基于**实际页面数据或明确前置条件检查**，不要仅凭脚本作者预设假设直接跳过。
@@ -49,7 +49,7 @@ allowed-tools: Read Glob Grep Edit Write Bash
 1. 从 `03` 中找出适合自动化的 `FT-*`，按功能域拆到 `ATS-*.spec.ts`。
 2. 先补页面对象，再写测试步骤；选择器和交互细节收敛到 `pages/*.page.ts`。
 3. 测试数据统一收敛到 `data/*.data.ts`，避免在 spec 内散落字面量。
-4. 使用 `global-setup.ts` + `storageState` 复用登录态，避免每条用例重复登录。
+4. 使用 `Tests/ui/global-setup.ts` + `storageState` 复用登录态，避免每条用例重复登录。
 5. 断言优先验证**真实业务结果**，不要只验证 toast 是否出现。
 6. 改动后先回归最小受影响 spec，再决定是否扩大回归范围。
 
@@ -68,12 +68,12 @@ allowed-tools: Read Glob Grep Edit Write Bash
 ### 6.3 夹具约定
 
 - 默认使用已登录 `authedPage`。
-- 认证态统一由 `global-setup.ts` 生成并通过 `storageState` 复用。
+- 认证态统一由 `Tests/ui/global-setup.ts` 生成，并通过 `storageState` 复用到 `Tests/ui/.auth/`。
 - 非鉴权本身的用例，不要在 `beforeEach` 里重新走登录流程。
 
 ## 7. 数据与环境约定
 
-- 环境地址、账号、密码统一走 `.env` / `.env.example`。
+- 环境地址、账号、密码统一走 `Tests/ui/.env` / `Tests/ui/.env.example`。
 - **禁止**在脚本中硬编码 `baseURL`、用户名、密码、验证码处理参数。
 - 测试数据要基于系统已有数据编写；需要真实新增数据时，要明确其对后续回归的影响。
 - 修改型场景必须确保形成**真实变更**，避免“写回原值”导致伪失败。

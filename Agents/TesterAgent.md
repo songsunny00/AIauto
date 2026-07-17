@@ -9,7 +9,7 @@
 - 为失败回归定位问题并修复脚本
 - 根据场景选择合适的 skill，而不是把所有事情都塞进一个 skill
 
-默认工作范围：`Tests/ui/...`
+默认工作范围：`Tests/ui/...`（共享层位于 `Tests/ui/`，模块脚本位于 `Tests/ui/<一级模块>/<二级模块>/`）
 
 ## 建议输入材料
 
@@ -67,8 +67,8 @@
 ## Playwright 硬规则
 
 - 选择器优先级：`data-testid` > `getByRole/name` > 稳定属性 > CSS/text 兜底
-- 登录态必须使用 `globalSetup + storageState`
-- 环境地址、账号、密码必须走 `.env` / `.env.example`
+- 登录态必须使用 `Tests/ui/global-setup.ts` + `storageState`
+- 环境地址、账号、密码必须走 `Tests/ui/.env` / `Tests/ui/.env.example`
 - 测试数据必须基于系统已有数据编写，不凭空造机构、项目、状态、合同
 - 保存/启停/状态切换类场景，**不能只看 toast**，要结合接口响应、返回码、弹窗关闭或列表状态变化
 - 不把 `networkidle` 当主要等待手段，优先元素可见、loading 消失、`waitForResponse`、`expect.poll`
@@ -81,14 +81,14 @@
 
 根据场景输出下列内容中的必要项：
 
-- `specs/ATS-*.spec.ts`
-- `pages/*.page.ts`
-- `fixtures/*.fixture.ts`
-- `data/*.data.ts`
-- `global-setup.ts`
-- `playwright.config.ts`
-- `.env.example`
-- `README.md`
+- `Tests/ui/<一级模块>/<二级模块>/specs/ATS-*.spec.ts`
+- `Tests/ui/<一级模块>/<二级模块>/pages/*.page.ts`
+- `Tests/ui/<一级模块>/<二级模块>/fixtures/*.fixture.ts`
+- `Tests/ui/<一级模块>/<二级模块>/data/*.data.ts`
+- `Tests/ui/global-setup.ts`
+- `Tests/ui/playwright.config.ts`
+- `Tests/ui/.env.example`
+- `Tests/ui/<一级模块>/<二级模块>/README.md`
 - 失败工件分析结论（如本轮是修失败）
 
 ## 维护要求

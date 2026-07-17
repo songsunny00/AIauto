@@ -1,3 +1,5 @@
 framework/*
 MySpace/*
 .env
+.playwright-cli/*
+./*/*/*/*/node_modules/*
