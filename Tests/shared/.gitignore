@@ -1,0 +1,3 @@
+# 登录态由 global-setup.ts 或 capture-auth.ts 生成，不入库
+.auth/
+node_modules/

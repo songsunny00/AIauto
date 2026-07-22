@@ -1,0 +1,14 @@
+{
+  "name": "ai-auto-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "测试资产共享依赖根：Tests/ui、Tests/api-automation、Tests/shared 共用 @playwright/test 与 tsx 的单一可解析来源",
+  "scripts": {
+    "install:shared": "npm install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "tsx": "^4.19.2",
+    "@types/node": "^26.1.1"
+  }
+}

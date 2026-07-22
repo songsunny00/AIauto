@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "test": "node run.mjs",
+    "test:list": "node run.mjs --list",
+    "test:install": "playwright install chromium",
+    "report": "playwright show-report",
+    "report:gen": "node gen-report.mjs",
+    "capture:auth": "npx tsx ../shared/capture-auth.ts"
+  }
+}

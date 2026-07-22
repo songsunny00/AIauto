@@ -1,0 +1,6 @@
+# 统一安装的依赖（@playwright/test / tsx / @types/node 等，单一来源在 Tests/package.json）
+node_modules/
+
+# Playwright 运行产物（报告、trace、截图等）
+test-results/
+playwright-report/

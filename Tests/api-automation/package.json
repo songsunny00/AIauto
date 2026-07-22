@@ -1,0 +1,10 @@
+{
+  "name": "ai-auto-tests-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "接口自动化（一期 Playwright API）。依赖安装在 Tests/ 级（见 Tests/package.json），共享登录态与 helper 来自 Tests/shared",
+  "scripts": {
+    "api": "npx playwright test --config=playwright.api.config.ts",
+    "capture:auth": "npx tsx ../shared/capture-auth.ts"
+  }
+}
