@@ -1,4 +1,4 @@
-# Tests/ui — 多模块 UI 自动化测试框架（Playwright）
+# Tests/ui-automation — 多模块 UI 自动化测试框架（Playwright）
 
 基于 [Playwright Test](https://playwright.dev/) 的 UI 端到端测试框架，按「一级模块 → 二级模块 → specs」三级目录组织用例，支持一次运行锁定一个一级模块、按需跑其下全部二级模块或单个二级模块。
 
@@ -25,14 +25,14 @@
 ## 3. 目录结构
 
 ```
-Tests/ui/                                         # 只放 UI 自己的用例与配置
+Tests/ui-automation/                              # 只放 UI 自己的用例与配置
 ├─ run.mjs                                        # 跨平台执行脚本（推荐测试入口）
 ├─ gen-report.mjs                                 # 测试报告生成器（读取 junit.xml -> Markdown）
 ├─ package.json                                   # 依赖 + npm scripts（capture:auth 走 ../shared）
 ├─ playwright.config.ts                           # 共享配置：动态 testDir / 报告目录 / 浏览器 channel
 ├─ global-setup.ts                                # 一级模块共享登录态生成 + 滑块验证码处理（写入 Tests/shared/.auth）
-├─ .env / .env.example                            # 环境与账号（.env 不入库）
-├─ .gitignore                                     # 忽略 .env / test-reports / node_modules
+├─ .env                                           # 环境与账号（含密码，不入库；仓库仅留 .env.example 占位）
+├─ .gitignore                                     # 忽略 .env / test-reports / shared/.auth（共享 node_modules 由 Tests/.gitignore 统一忽略）
 ├─ test-reports/<一级模块>/<二级模块|all-modules>/{html, junit.xml, artifacts}
 └─ <一级模块>/                                     # 运行边界（如 CONFIG-配置中心）
    └─ <二级模块>/                                  # 筛选项（如 BILLCFG-商业化计费配置）
@@ -42,13 +42,13 @@ Tests/ui/                                         # 只放 UI 自己的用例与
       ├─ data/*.data.ts                            # 测试数据
       └─ README.md                                 # 二级模块说明
 
-# 共享层（ui 与 api-automation 共用，不在 ui 内）：
+# 共享层（ui-automation 与 api-automation 共用，不在 ui-automation 内）：
 Tests/shared/
 ├─ .auth/<一级模块>/domain-state.json             # 共享登录态（global-setup / capture-auth 生成）
 ├─ auth/{auth-state.ts, api-auth.ts}              # 登录态路径解析 + 接口请求上下文 helper
 └─ capture-auth.ts                                # 手动导出登录态（人工过验证码）
 
-# 接口自动化（与 ui 同级，复用同一份登录态）：
+# 接口自动化（与 ui-automation 同级，复用同一份登录态）：
 Tests/api-automation/
 ├─ package.json                                   # scripts: api / capture:auth
 ├─ playwright.api.config.ts                       # 接口配置，use.storageState 指向 Tests/shared/.auth
@@ -57,21 +57,21 @@ Tests/api-automation/
 
 ## 4. 安装与初始化
 
-> 依赖已**统一上提到 `Tests/` 级**（`Tests/package.json` 单一来源，ui 与 api-automation 共用），**不要在 `Tests/ui` 下再执行 `npm install`**，否则会在 ui 下重新生成一份 `node_modules`。
+> 依赖已**统一上提到 `Tests/` 级**（`Tests/package.json` 单一来源，ui-automation 与 api-automation 共用），**不要在 `Tests/ui-automation` 下再执行 `npm install`**，否则会在 ui-automation 下重新生成一份 `node_modules`。
 
 ```powershell
 # 依赖只需在 Tests/ 级装一次（已装过则跳过）
 cd d:\AIauto\Tests
 npm install
 # 若使用自带 Chromium（而非系统 Edge/Chrome）才需要执行：
-cd d:\AIauto\Tests\ui
+cd d:\AIauto\Tests\ui-automation
 npm run test:install
 ```
 
 复制并填写环境配置（`.env` 已忽略入库，不会提交）：
 
 ```powershell
-cd d:\AIauto\Tests\ui
+cd d:\AIauto\Tests\ui-automation
 Copy-Item .env.example .env
 # 编辑 .env，至少确认以下字段：
 #   TEST_BASE_URL=http://localhost:7001
@@ -169,7 +169,7 @@ TEST_DOMAIN_PATH=CONFIG-配置中心 TEST_MODULE_PATH=BILLCFG-商业化计费配
 ```yaml
 # 示例：在 CI 中跑单二级模块并产出 JUnit
 - run: |
-    cd Tests/ui
+    cd Tests/ui-automation
     node run.mjs --domain CONFIG-配置中心 --module BILLCFG-商业化计费配置
   # 失败时读取 test-reports/CONFIG-配置中心/BILLCFG-商业化计费配置/junit.xml
 ```
@@ -238,7 +238,7 @@ Start-Process msedge -ArgumentList "--remote-debugging-port=9222"
 
 # 第 2 步：在打开的浏览器里手动登录（人工拖验证码），停在业务页
 # 第 3 步：另开终端，导出登录态（写回同一份 Tests/shared/.auth/<一级模块>/domain-state.json）
-cd Tests/ui        # 或 cd Tests/api-automation，二者都有 capture:auth 脚本
+cd Tests/ui-automation        # 或 cd Tests/api-automation，二者都有 capture:auth 脚本
 $env:TEST_DOMAIN_PATH = 'CONFIG-配置中心'
 npm run capture:auth
 ```
@@ -249,7 +249,7 @@ npm run capture:auth
 
 ## 10. 接口测试复用登录态
 
-接口自动化（一期 Playwright API，位于 `Tests/api-automation`，与 `Tests/ui` 同级）复用与 UI **同一份**登录态，因此接口用例也无需登录、无需过验证码：
+接口自动化（一期 Playwright API，位于 `Tests/api-automation`，与 `Tests/ui-automation` 同级）复用与 UI **同一份**登录态，因此接口用例也无需登录、无需过验证码：
 
 ```powershell
 cd Tests/api-automation

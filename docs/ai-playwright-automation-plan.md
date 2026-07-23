@@ -43,15 +43,17 @@
 
 | 资产类型 | 编号规则 | 说明 |
 |---|---|---|
-| 需求功能点 | `REQ-{L1}-{L2}-{L3}-{NNN}` | 来源于 `Prds/` 目录路径 |
+| 需求功能点 | `REQ-{L1}-{L2}-{L3}-{NNN}` | `L1/L2` 对应模块目录，`L3` 为功能点 |
 | 功能测试点 | `FT-{L1}-{L2}-{L3}-{NNN}` | 来源于 `03-测试用例文档.md` |
 | UI 自动化脚本 | `ATS-{L1}-{L2}-{L3}-{NNN}.spec.ts` | 与功能点稳定绑定 |
 
-示例：
+示例（以 V1.6.1 试点「商业化计费配置」为准）：
 
-- 需求：`REQ-CONFIG-REPORTCFG-TYPECFG-001`
-- 测试点：`FT-CONFIG-REPORTCFG-TYPECFG-001`
-- 脚本：`ATS-CONFIG-REPORTCFG-TYPECFG-001.spec.ts`
+- 需求：`REQ-CONFIG-BILLCFG-LIST-001`
+- 测试点：`FT-CONFIG-BILLCFG-LIST-001`
+- 脚本：`ATS-CONFIG-BILLCFG-LIST-001.spec.ts`
+
+> 编号层级 `REQ-{L1模块}-{L2子模块}-{L3功能点}-{NNN}` 中，`L1/L2` 对应目录 `CONFIG-配置中心/BILLCFG-商业化计费配置`，`L3` 为功能点（列表 LIST / 表单 FORM / 详情 DETAIL），不单独建目录，统一落在对应模块的 `specs/` 下。
 
 ### 3.2 映射约束
 
@@ -67,28 +69,59 @@
 
 ## 4. `Tests/` 下 UI 自动化推荐目录结构
 
-建议按需求目录主线对齐，脚本按功能叶子目录落位：
+建议按"模块 / 子模块"主线对齐（与 `REQ` 编号的 `L1/L2` 一致），脚本按功能点命名落在对应模块的 `specs/` 下。以 V1.6.1 试点「商业化计费配置」真实结构为准：
 
 ```text
-Tests/
-└─ ui/
-   └─ CONFIG-配置中心/
-      └─ REPORTCFG-报告配置/
-         └─ TYPECFG-报告类别配置/
-            ├─ specs/
-            │  ├─ ATS-CONFIG-REPORTCFG-TYPECFG-001.spec.ts
-            │  └─ ATS-CONFIG-REPORTCFG-TYPECFG-002.spec.ts
-            ├─ fixtures/
-            │  └─ typecfg.fixture.ts
-            ├─ data/
-            │  └─ typecfg.data.ts
-            ├─ pages/
-            │  └─ typecfg.page.ts
-            ├─ snapshots/
-            └─ README.md
+Tests/                                         ← 测试资产根（含共享依赖）
+├─ node_modules/                               ★ 共享依赖根（Tests/package.json 声明，npm install 生成，应忽略）
+├─ package.json / package-lock.json            ★ 共享依赖与脚本来源（ui-automation / api-automation / shared 上溯共用）
+├─ ui-automation/                             ← UI 自动化根目录
+│  ├─ .env                                     ★ 执行必需：测试地址 / 账号 / 浏览器 channel
+│  ├─ run.mjs                                  ★ 执行入口：node run.mjs --domain <一级> --module <二级>
+│  ├─ playwright.config.ts                     ★ 主配置：加载 .env、调用 global-setup、定位 specs
+│  ├─ global-setup.ts                          ★ 全局登录态：读 .env 账号 → 写 shared/.auth/domain-state.json
+│  ├─ package.json                             ○ 仅含 scripts，依赖上溯到 Tests/node_modules
+│  ├─ gen-report.mjs                           ○ 辅助：读 junit.xml 生成 Markdown 报告
+│  ├─ playwright.config.noglobal.ts            ○ 辅助：无 global-setup 的备选配置
+│  ├─ CONFIG-配置中心/
+│  │  └─ BILLCFG-商业化计费配置/               ← 与 REQ 的 CONFIG / BILLCFG 对齐
+│  │     ├─ specs/        ATS-CONFIG-BILLCFG-*.spec.ts   ★ 用例脚本（run.mjs 实际执行目标）
+│  │     ├─ fixtures/     *.fixture.ts         登录态、数据装配、前后置
+│  │     ├─ data/         *.data.ts            稳定输入 / 断言数据
+│  │     ├─ pages/        *.page.ts            页面对象封装
+│  │     ├─ snapshots/    页面结构快照 / 调试参考
+│  │     └─ README.md     本目录覆盖范围、账号、数据说明
+│  └─ test-reports/                            ○ 执行产物（html / junit.xml / artifacts / zip）
+├─ api-automation/                             ← 接口自动化根（共用 Tests/node_modules）
+│  └─ CONFIG-配置中心/BILLCFG-商业化计费配置/api-specs/  *.spec.ts
+└─ shared/                                     ← 公共能力（非模块目录）
+   ├─ .auth/<一级模块>/domain-state.json        ★ 登录态（global-setup 运行时生成）
+   └─ capture-auth.ts                          登录态抓取脚本
 ```
 
-### 4.1 各目录职责
+> 图例：★ = 执行 `node run.mjs ...` 必需；○ = 辅助 / 可选，删掉不影响该命令执行。
+> 依赖共用：`Tests/package.json` 声明 `@playwright/test` / `tsx`，统一装在 `Tests/node_modules`；`ui-automation` 自身零依赖，运行时由 Node 向上解析到共享根。
+> 执行链路：`run.mjs` → `playwright.config.ts`（读 `.env`）→ `global-setup.ts`（写登录态）→ 跑 `CONFIG-配置中心/BILLCFG-商业化计费配置/specs/*.spec.ts`。
+
+### 4.1 测试环境与账号（`.env`，执行必需）
+
+`run.mjs` 实际执行时由 `playwright.config.ts` 自动加载根目录 `.env`，`global-setup.ts` 读取其中的账号完成登录态。缺少 `.env` 会直接报错 `TEST_USERNAME / TEST_PASSWORD missing`。当前 `.env` 内容：
+
+```text
+# 测试环境地址（本地服务）
+TEST_BASE_URL=http://localhost:7001
+
+# 测试账号（admin 角色，菜单权限需含 menuId=11013）
+TEST_USERNAME=admin_shl
+TEST_PASSWORD=admin_shl@123
+
+# 浏览器 channel：留空使用 Playwright 自带 chromium；本机使用系统 Edge，设为 msedge
+PW_BROWSER_CHANNEL=msedge
+```
+
+> ⚠️ 安全提示：`.env` 含真实密码，**必须加入 `.gitignore` 禁止提交**，仓库只保留 `.env.example` 占位模板。`ui-automation/.gitignore`（忽略 `.env` / `shared/.auth/` / `test-reports/`）与 `Tests/.gitignore`（忽略共享 `node_modules/`）已就位。
+
+### 4.2 各目录职责
 
 | 目录 | 职责 | 是否必须 |
 |---|---|---|
@@ -99,13 +132,13 @@ Tests/
 | `snapshots/` | 页面结构快照、调试参考 | 否 |
 | `README.md` | 本目录覆盖范围、账号、数据说明 | 否 |
 
-### 4.2 命名要求
+### 4.3 命名要求
 
 - 脚本：`ATS-*.spec.ts`
 - 页面对象：`*.page.ts`
 - 夹具：`*.fixture.ts`
 - 测试数据：`*.data.ts`
-- 公共能力统一沉淀在 `Tests/ui/_shared/`
+- 公共能力统一沉淀在 `Tests/shared/`（登录态、通用工具），模块内不重复造轮子
 
 不建议：
 
@@ -228,6 +261,17 @@ AI 不应直接做：
 - 在没有需求依据时发明断言
 - 绕过定位规范乱写选择器
 
+### 7.4 已落地的两个 skill（项目级执法规范）
+
+本方案在 V1.6.1 试点中已沉淀两个 skill，分别对应「探索式功能验证」与「确定性回归脚本」两条路线，二者互补、共用同一套编号与目录：
+
+| skill | 路线定位 | 谁做判断 | 适用阶段 | 核心产出 |
+| --- | --- | --- | --- | --- |
+| `playwright-cli-testing` | 探索式功能验证（AI 当驾驶员） | AI Agent 实时驱动（~920K Token） | 首轮摸底、需求/用例可行性验证、缺陷探查 | 功能测试报告（含截图留证） |
+| `playwright-test-implementation` | 确定性回归脚本（人写断言） | 预写 `expect` 断言、机器执行 | 正式回归、版本迭代、失败修复 | 可执行 `ATS-*.spec.ts` + `junit.xml` / trace |
+
+> 两个 skill 的关系即 §2「确定性优先、AI 辅助」的具体落地：cli 先探索验证可行性，test 再固化为确定性回归。其约束细则见 §12。
+
 ---
 
 ## 8. 失败归因与结果回填
@@ -248,18 +292,18 @@ UI 自动化失败建议统一分 5 类：
 
 每次执行完成后，至少回填以下位置：
 
-1. `versions/04-测试执行记录.md`
+1. `Prds/<版本>/04-测试执行记录.md`（如 `Prds/V1.6.1/04-测试执行记录.md`）
    - 执行版本
    - 执行时间
    - 脚本编号
    - 通过/失败
    - 失败分类
-   - 报告链接
-2. `versions/05-变更记录.md`
+   - 报告链接（指向 `Tests/ui-automation/test-reports/`）
+2. `Prds/<版本>/05-变更记录.md`（如 `Prds/V1.6.1/05-变更记录.md`）
    - 若因需求变更、页面变更导致脚本调整，记录变更原因
-3. `03-测试用例文档.md`
+3. `Prds/<版本>/03-测试用例文档.md`
    - 若测试点发生增删改，需要同步维护
-4. 后续 `TRACE.yaml` / 映射文件
+4. `Prds/<版本>/TRACE.yaml` 或映射文件
    - 更新 `REQ -> FT -> ATS -> 执行结果` 的链路状态
 
 ### 8.3 报告字段建议
@@ -304,14 +348,15 @@ UI 自动化失败建议统一分 5 类：
 
 一期建议至少落地以下内容：
 
-1. `Tests/ui/` 目录骨架
-2. `data-testid` 与稳定定位规范
-3. 登录态复用机制（`storageState`）
+1. `Tests/ui-automation/` 与 `Tests/api-automation/` 目录骨架（V1.6.1 试点已落地）
+2. `data-testid` 与稳定定位规范（详设 §7 清单前置）
+3. 登录态复用机制（`storageState`，见 §12.2）
 4. 首批 5-10 个 P0/P1 脚本
 5. 脚本命名与目录规范
-6. 执行报告输出规范
+6. 执行报告输出规范（双路线：cli 截图 + test `junit.xml`/trace）
 7. 失败分类与回填规则
 8. 与需求编号的映射关系
+9. 两个 skill 执法规范（`playwright-cli-testing` / `playwright-test-implementation`）
 
 ---
 
@@ -327,3 +372,80 @@ UI 自动化一期推荐路线不变：
 - 能复用同一套 TypeScript / Playwright 能力栈
 - 便于后续与接口自动化统一治理
 - 便于把需求编号、测试点、脚本、报告串成一条链路
+- **已实现双路线闭环**：`playwright-cli-testing` 探索验证 + `playwright-test-implementation` 回归固化（V1.6.1 试点实证见 §13）
+
+---
+
+## 12. 两个 skill 的执法细则（从实践提炼）
+
+> 以下约束来自 V1.6.1 试点实际使用的两个 skill 规范，是 §7.4 的落地细则。凡建脚本/跑用例，必须遵循。
+
+### 12.1 定位优先级（两 skill 统一）
+
+1. `getByTestId`（第一优先，依赖详设 §7 的 `data-testid` 清单）
+2. `getByRole + name`
+3. `locator` + 稳定属性（含 `text` 精确比对）
+4. 最后才考虑脆弱 CSS 路径
+
+### 12.2 登录态复用
+
+- 统一用 `storageState` 复用登录态，避免每个用例重复登录。
+- `Tests/shared/auth/capture-auth.ts` 负责抓取并落盘 `state.json`，各用例 `setup` import 复用。
+- 登录态失效时重跑 `capture-auth.ts` 即可，不污染业务脚本。
+
+### 12.3 `playwright-cli-testing` 探索式验证约束
+
+- **判定基于 DOM，不靠视觉**：校验类用例强制在 JS 内对 DOM 文案做 `===` 精确比对（`run-code` 取实际文案 → 比对 → 返回 JSON），截图仅留证、不喂模型当判定输入。
+- **每个用例必截全屏图**，命名含 `REQ/FT` 编号，作为报告证据。
+- **数据生命周期**：用完即清理（删除/恢复），保证可重复执行；截图也需定期归档或清理。
+- 用途：首轮可行性验证、缺陷探查、需求/用例是否可自动化评估。
+
+### 12.4 `playwright-test-implementation` 回归脚本约束
+
+- 产出标准 Playwright Test 脚本 `ATS-{L1}-{L2}-{L3}-{NNN}.spec.ts`，断言写死 `expect`。
+- **文案断言必须精确**：用 `toContain` / 正则提取后精确比对，禁止模糊包含以免假绿。
+- 必须接入登录态 `storageState`、稳定等待、失败 `trace` 与 `junit.xml` 输出。
+- 用途：正式回归、版本迭代门禁、失败修复验证。
+
+### 12.5 失败归因与回填（与 §8 一致）
+
+- 失败统一分 `ENV / DATA / SCRIPT / DEFECT / CHANGE` 五类。
+- 报告/执行记录回填到 `Prds/<版本>/04-测试执行记录.md`、`05-变更记录.md`、`TRACE.yaml`。
+
+---
+
+## 13. V1.6.1 试点实证（商业化计费配置）
+
+> 两份过程报告：`测试报告-V1.6.1-商业化计费配置-playWright-cli功能测试0714.md`（探索式）与 `测试报告-V1.6.1-商业化计费配置-Playwright回归测试0714.md`（回归式）。结论与 `对比报告-playwright-cli-vs-playwright-test.md` 相互印证。
+
+### 13.1 双路线结果对照
+
+| 维度 | playwright-cli 功能测试（探索） | Playwright 回归测试（test） |
+| --- | --- | --- |
+| 模式 | AI 当驾驶员，实时驱动 | 预写脚本，机器确定性执行 |
+| 断言方式 | AI 对 DOM 文案 `===` 精确比对 | `expect` 断言 |
+| 用例总数 | 39 | 42 |
+| 通过 / 不通过 / 条件不满足·skip | 23 通过 / 4 不通过 / 8 条件不满足·部分通过 | 29 通过 / 5 不通过 / 8 skipped（多为前置数据/权限不足） |
+| 执行通过率（已执行口径） | 65.7%（23/35） | 85.3%（29/34） |
+| 准确度（系统实现与用例预期一致比例） | 89.7% | — |
+| 覆盖范围 | 列表/表单/详情/权限显隐/空状态 | 同左（同一批 REQ，另含少量 PT 权限用例） |
+| 典型失败点 | 4 项"提示文案与用例预期不符"（功能生效但文案偏差） | 5 项集中在新增/编辑表单链路（toast 未捕获、20s 超时、校验顺序） |
+| 产物 | 全屏截图留证 + 功能测试报告 | `junit.xml` + trace + 回归报告（约 4 分 42 秒 / 42 例） |
+| 成本特征 | 高 Token（~920K / 60+ 模型调用） | 脚本一次性投入，回归零 Token（8.3s/条） |
+| 定位方式 | 主要 `data-testid` + `getByRole` + `storageState` 复用登录态 | 同左 |
+
+### 13.2 关键结论
+
+- **两路线发现的问题互补而非重合**：cli 暴露的是"前端提示文案与测试用例定义不一致"（4 项，功能本身生效，属用例/实现口径偏差）；test 暴露的是"表单链路脚本稳定性问题"（toast 等待、超时、校验触发顺序）。说明 **cli 擅长发现需求/实现口径问题，test 擅长暴露脚本脆弱点**，二者组合覆盖更全。
+- **登录态 `storageState` 两路线均已复用**：cli 通过 `globalSetup` 保存 `.auth/billing-state.json` 免验证码；test 同机制，验证 §12.2 有效。
+- **成本取舍印证策略**：cli 首轮探索消耗 ~920K Token，但快速定位口径问题；test 回归零 Token、可重复，印证 §2「确定性优先、AI 辅助」。
+- **判定本质**：cli 由 AI 驱动但判定基于 DOM 结构化数据（非视觉），与 §1.4 辨析一致。
+- **数据/用例可补强点**：cli 的"条件不满足"（如分页因数据量仅 1 页无法触发）、test 的 skip（前置数据不足）提示需要补造测试数据以覆盖边界。
+
+### 13.3 后续优化点（来自试点）
+
+1. 登录态 `storageState` 已复用，但需加入失效自动重抓钩子。
+2. cli 报告截图需规范归档路径，避免堆积。
+3. test 脚本应强化表单链路的 toast 等待与校验顺序断言，对齐 cli 已验证范围。
+4. 补造测试数据（分页、CONFIRMED 消耗记录等），消除 skip / 条件不满足用例。
+5. 两路线共用同一 `data-testid` 字典，需与详设 §7 保持同步更新机制。

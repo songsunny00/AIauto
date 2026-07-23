@@ -213,6 +213,19 @@ UI 自动化优先承担：
 - 需要多浏览器回归的场景
 - 希望 UI 与 API 自动化统一技术栈的项目
 
+**方案名澄清（"Playwright + AI" 指什么）**：
+
+- **本方案指 `@playwright/test` 确定性回归为主、AI 做辅助**：AI 在此是"副驾"——负责页面结构分析、脚本骨架生成、失败定位与回归复盘；真正驱动浏览器、执行断言的是 Playwright 固定脚本。
+- **不等于 playwright-cli / Browser Use 这类"AI 当驾驶员"的探索方案**：后者把"每步点什么、判断对不对"交给 LLM 动态决策，在本文档中归为"Browser Use + AI"（补充型），本方案名不指代它。
+- **"两者结合"是整体架构建议，不是本方案名本身的含义**：本文档推荐"先用 playwright-cli / Browser Use 探索摸底，再用本方案落正式脚本"，即"Playwright + AI（正式回归）"与"AI 探索方案（补充）"组合成完整体系。
+
+| 文档方案名 | 实际指代 | AI 角色 | 定位 |
+| --- | --- | --- | --- |
+| Playwright + AI（本方案） | `@playwright/test` + AI 辅助 | 副驾（生成 / 分析） | 主方案（正式回归） |
+| Browser Use + AI | AI 驱动探索（含本项目 playwright-cli） | 驾驶员（动态决策） | 补充型（探索摸底） |
+
+一句话：本方案 = Playwright 确定性回归为主、AI 辅助增强；探索式 AI 操作属于另一类（Browser Use / playwright-cli），建议两者组合使用。
+
 #### 6.1.2 Cypress + AI
 
 技术简介：
@@ -300,6 +313,20 @@ UI 自动化优先承担：
 - Browser Use 更适合放在“页面探索层、分析层、辅助执行层”。
 - Playwright 更适合放在“正式回归执行层、发布门禁层”。
 - 如果两者结合，推荐顺序是：**先用 Browser Use/`browser_snapshot` 做页面理解和摸底，再用 Playwright 落正式脚本**。
+
+**底层机制澄清（Browser Use 与 Playwright 的关系）**：
+
+- **底层引擎一致**：Browser Use 的底层默认就是 Playwright，由它真正驱动浏览器（开页面、操作元素、读取 DOM / accessibility tree）；AI 模型只负责"看页面 → 决定下一步操作 → 调用 Playwright 执行"的决策层。所谓"操作浏览器"的能力来自 Playwright，并非 Browser Use 另写了一套引擎。
+- **区别不在引擎，在"谁写判定逻辑"**：纯 `@playwright/test` 由人预写 `expect` 断言、机器确定性执行；Browser Use 把"每步点什么、判断对不对"交给 LLM 动态决策。两者底层都是 Playwright 读 DOM，差异只在于决策方。
+- **与本项目两种 UI 测试方式同源**：Browser Use 与本项目 `playwright-cli-testing`（AI Agent 驱动、底层 Playwright、判定基于 DOM 结构化数据）属同一类；`@playwright/test` 属另一类（纯脚本）。即 Browser Use ≈ 产品化打包的"AI + Playwright"，与"cli 先行、脚本跟进"的实践一致。
+
+| 维度 | Browser Use | playwright-cli | @playwright/test |
+| --- | --- | --- | --- |
+| 底层引擎 | Playwright | Playwright | Playwright |
+| 决策方 | LLM 动态决策 | LLM（AI Agent）驱动 | 预写脚本 `expect` |
+| 定位 | 探索 / 摸底 / 辅助 | 探索式功能验证 | 正式回归门禁 |
+
+一句话：Browser Use 适合页面摸底与探索，正式回归仍交给 `@playwright/test`。
 
 #### 6.1.5 综合对比表
 
@@ -596,6 +623,14 @@ Tests/ui/
 1. 先看前端代码：确认路由、页面入口、关键组件、接口依赖、可补的 `data-testid`。
 2. 再看 `browser_snapshot`：确认实际可见元素、名称、层级、显隐状态、弹窗和动态区域。
 3. 最后再写脚本：基于代码理解和运行态真相一起确定定位方式、断言点和等待策略。
+
+**把 data-testid 清单前置到详设阶段，可让静态探索价值最大化**：
+
+- **定位痛点前置解决**：UI 自动化最大的失败来源是"定位脆弱"（CSS 路径变、文案变、DOM 层级变）。把稳定标识约定写进详设（如 `02-详细设计文档.md` 的 §7 data-testid 清单），等于把上文"前端配合要求"前置落地——AI 静态探索代码时直接拿到"稳定定位字典"，无需猜脆弱 CSS、不依赖易变文案，脚本直接用 `getByTestId(...)` 精准定位。
+- **结构意图显式沉淀**：详设清单通常标注每个 testid 的所在文件、行号、关联组件、关联 REQ、使用场景与命名类型（静态 / 动态），AI 看清单即可理解页面结构与分支规则，相当于"带着地图探索"，静态探索几乎完整。
+- **仍需运行态校验补真实**：data-testid 解决"定位 + 结构意图"这一半（且是最痛的一半）；权限显隐的真实效果、异步渲染、接口数据驱动的展示、文案与 toast 反馈，仍需 `browser_snapshot` / playwright-cli 在运行态校验。即"详设出清单做静态探索 → 运行态校验真实性"是更稳的组合。
+
+一句话：详设即出 data-testid 清单，是把"前端配合要求"前移到设计阶段，让"先看代码探索"这一步直接具备稳定、可追溯（REQ 关联）的定位基础。
 
 ### 9.6 UI 编写与执行流程
 

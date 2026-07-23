@@ -8,13 +8,13 @@ allowed-tools: Read Glob Grep Edit Write
 
 ## 1. 目标
 
-围绕目标模块输出一套可直接起步的 UI 自动化骨架方案，服务 `Tests/ui/...` 目录建设和 Playwright 脚本起步。
+围绕目标模块输出一套可直接起步的 UI 自动化骨架方案，服务 `Tests/ui-automation/...` 目录建设和 Playwright 脚本起步。
 
 ## 2. 适用输入
 
+- `02-详细设计文档.md`（含 §7 `data-testid` 清单，是 UI 自动化稳定定位字典的直接输入）
 - `03-测试用例文档.md`
 - `01-需求文档.md`
-- `01c-原型文档.md`（如有）
 - 页面路径 / 路由信息
 - 相关前端代码（如可读）
 
@@ -35,16 +35,16 @@ allowed-tools: Read Glob Grep Edit Write
 2. 结合页面结构与原型说明，建议脚本拆分方式。
 3. 输出 `ATS-*.spec.ts` 命名建议。
 4. 输出页面对象、夹具、数据文件的最小清单。
-5. 标记对前端可测性要求，如 `data-testid`。
+5. 标记对前端可测性要求，如 `data-testid`；**实际 `data-testid` 以 `02-详细设计文档.md` §7 清单为准**，缺失时再要求前端补充。
 6. **生成测试数据前，先访问测试页面查看系统已有数据**（机构名、项目名、状态值等），基于实际数据编写，不要凭空编造。
 
 ## 5. 目录结构建议
 
 默认采用“**测试资产共享层（Tests/）+ UI 套件 + 接口套件 + 一级模块 + 二级模块**”结构。
 
-- **共享层**：放在 `Tests/`（含 `Tests/package.json` 依赖单一来源）与 `Tests/shared/`（登录态、鉴权 helper、手动导出脚本），供 `Tests/ui` 与 `Tests/api-automation` 共用。
-- **UI 套件**：`Tests/ui/`，只放 UI 自己的用例与配置（`playwright.config.ts`、`global-setup.ts`、`.env`、公共脚本、报告）。
-- **接口套件**：`Tests/api-automation/`，与 `Tests/ui` 同级，复用同一份登录态。
+- **共享层**：放在 `Tests/`（含 `Tests/package.json` 依赖单一来源）与 `Tests/shared/`（登录态、鉴权 helper、手动导出脚本），供 `Tests/ui-automation` 与 `Tests/api-automation` 共用。
+- **UI 套件**：`Tests/ui-automation/`，只放 UI 自己的用例与配置（`playwright.config.ts`、`global-setup.ts`、`.env`、公共脚本、报告）。
+- **接口套件**：`Tests/api-automation/`，与 `Tests/ui-automation` 同级，复用同一份登录态。
 - **一级模块**：如 `CONFIG-配置中心/`。
 - **二级模块**：如 `BILLCFG-商业化计费配置/`，只放本模块自己的 `specs/pages/fixtures/data/README`。
 
@@ -53,22 +53,20 @@ Tests/
 ├── package.json                # 依赖单一来源：@playwright/test + tsx + @types/node
 ├── node_modules/               # 统一安装目录（ui/api 向上解析复用）
 ├── .gitignore                  # 忽略 node_modules / 运行产物
-├── shared/                     # 共享层（ui 与 api-automation 共用，不在 ui 内）
+├── shared/                     # 共享层（ui-automation 与 api-automation 共用，不在 ui-automation 内）
 │   ├── .auth/                  # 共享认证态（gitignore），按一级模块隔离
 │   │   └── <一级模块>/domain-state.json
 │   ├── auth/
 │   │   ├── auth-state.ts       # 登录态路径解析
 │   │   └── api-auth.ts         # 接口请求上下文 helper（带登录 cookie / token）
 │   └── capture-auth.ts         # 手动导出登录态（connectOverCDP，人工过验证码）
-├── ui/                         # UI 套件：只放 UI 用例与配置
+├── ui-automation/              # UI 套件：只放 UI 用例与配置
 │   ├── package.json            # 仅 scripts（依赖走 Tests/ 级，不放 devDependencies）
 │   ├── run.mjs                 # 跨平台执行入口
 │   ├── gen-report.mjs          # junit.xml -> Markdown 报告
 │   ├── playwright.config.ts    # 动态 testDir / 报告目录 / 浏览器 channel
 │   ├── global-setup.ts         # 登录 + 滑块验证码，写入 Tests/shared/.auth/<一级模块>/domain-state.json
 │   ├── .env / .env.example     # 环境与账号（.env 不入库）
-│   ├── solve-captcha.js        # 共享验证码处理脚本
-│   ├── get-gap.js              # 共享图片缺口识别脚本
 │   ├── test-reports/<一级模块>/<二级模块|all-modules>/{html,junit.xml,artifacts}
 │   ├── CONFIG-配置中心/        # 一级模块
 │   │   ├── BILLCFG-商业化计费配置/ # 二级模块
@@ -83,16 +81,16 @@ Tests/
 │   │   │   └── README.md
 │   │   └── <其他二级模块>/
 │   └── <其他一级模块>/
-└── api-automation/             # 接口套件（与 ui 同级，复用同一份登录态）
+└── api-automation/             # 接口套件（与 ui-automation 同级，复用同一份登录态）
     ├── package.json            # scripts: api / capture:auth（依赖走 Tests/ 级）
     ├── playwright.api.config.ts # use.storageState 指向 Tests/shared/.auth
     └── <一级模块>/<二级模块>/api-specs/*.api.spec.ts
 ```
 
 说明：
-- **依赖只在 `Tests/` 级安装一份**（`Tests/package.json`），`ui` 与 `api-automation` 通过 npm 向父目录解析复用，不要在二级套件下再 `npm install`。
+- **依赖只在 `Tests/` 级安装一份**（`Tests/package.json`），`ui-automation` 与 `api-automation` 通过 npm 向父目录解析复用，不要在二级套件下再 `npm install`。
 - **登录态统一在 `Tests/shared/.auth/<一级模块>/domain-state.json`**，UI 与接口共用同一份，验证码只需过一次。
-- 共享脚本 `solve-captcha.js`、`get-gap.js` 目前放 `Tests/ui/` 根下；若后续扩展再演进为 `utils/`。默认不要把 `.env`、`playwright.config.ts`、`global-setup.ts` 散落到二级模块目录。
+- 验证码处理已内联进 `global-setup.ts`（滑块破解不再单独成脚本）；默认不要把 `.env`、`playwright.config.ts`、`global-setup.ts` 散落到二级模块目录。
 
 ## 6. 文件建议
 
@@ -107,7 +105,7 @@ Tests/
 | `Tests/shared/auth/api-auth.ts`     | 接口请求上下文 helper（带登录 cookie / token）              | 按需 |
 | `Tests/shared/capture-auth.ts`      | 手动导出登录态（connectOverCDP，人工过验证码）              | 按需 |
 
-### 6.2 UI 套件文件（`Tests/ui/`）
+### 6.2 UI 套件文件（`Tests/ui-automation/`）
 
 | 文件 / 目录                  | 说明                                              | 必需 |
 | ---------------------------- | ------------------------------------------------- | ---- |
@@ -117,9 +115,8 @@ Tests/
 | `global-setup.ts`            | 登录 + 验证码处理 + 写入 `Tests/shared/.auth`     | ✅   |
 | `.env` / `.env.example`      | `TEST_BASE_URL`、`TEST_USERNAME`、`TEST_PASSWORD` | ✅   |
 | `test-reports/`              | 报告输出目录                                      | ✅   |
-| `solve-captcha.js` / `get-gap.js` | 共享脚本，如验证码、图片处理等               | 按需 |
 
-### 6.3 二级模块文件（`Tests/ui/<一级模块>/<二级模块>/`）
+### 6.3 二级模块文件（`Tests/ui-automation/<一级模块>/<二级模块>/`）
 
 | 文件                    | 说明                                 | 必需 |
 | ----------------------- | ------------------------------------ | ---- |
@@ -175,10 +172,10 @@ Tests/
 - 脚本命名必须保留功能点编号主线。
 - 优先用稳定定位点，再考虑脆弱选择器。
 - UI 自动化骨架可前置，但完整主场景脚本应在页面结构和定位点基本稳定后补齐。
-- **禁止在测试脚本中硬编码测试环境地址与账号**，必须通过 `Tests/ui/.env` 这类环境配置注入。
+- **禁止在测试脚本中硬编码测试环境地址与账号**，必须通过 `Tests/ui-automation/.env` 这类环境配置注入。
 - **禁止每个测试用例单独登录**，必须复用 `Tests/shared/.auth/<一级模块>/domain-state.json` 认证态（UI 由 `globalSetup` 生成、接口由 `storageState` 消费）。
 - **禁止用 `networkidle` 作为主要等待手段**，改用 DOM 元素可见性断言。
-- **选择器必须优先使用 `data-testid`**，缺失时要求前端补充，而非直接用脆弱的 CSS class 或文本定位。
+- **选择器必须优先使用 `data-testid`**（实际取值以 `02-详细设计文档.md` §7 清单为准），缺失时要求前端补充，而非直接用脆弱的 CSS class 或文本定位。
 - **测试数据必须基于系统已有数据编写**，先访问页面查看实际值（机构名、项目名、产品名、状态值等），不要凭空编造。
-- **依赖统一安装在 `Tests/` 级**（`Tests/package.json` 单一来源），不要在 `Tests/ui`、`Tests/api-automation` 下重复 `npm install`。
-- **登录态与鉴权 helper 统一放 `Tests/shared/`**，供 UI 与接口共用；**UI 自己的 `playwright.config.ts`、`global-setup.ts`、`.env`、公共脚本放 `Tests/ui/`**，不要为每个二级模块重复放置一套。
+- **依赖统一安装在 `Tests/` 级**（`Tests/package.json` 单一来源），不要在 `Tests/ui-automation`、`Tests/api-automation` 下重复 `npm install`。
+- **登录态与鉴权 helper 统一放 `Tests/shared/`**，供 UI 与接口共用；**UI 自己的 `playwright.config.ts`、`global-setup.ts`、`.env`、公共脚本放 `Tests/ui-automation/`**，不要为每个二级模块重复放置一套。

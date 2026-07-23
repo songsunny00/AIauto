@@ -1,0 +1,65 @@
+# Codes/mappings/prd-to-code.yaml
+# 需求 -> 代码 映射总文件（落地蓝图 §5.1，按本次落地约定简化到模块级）
+#
+# 作用：
+#   把需求模块（二级编码，如 CONFIG/BILLCFG）与对应的前端仓 / 后端仓 / 页面入口
+#   建立结构化关联，作为"需求 -> 开发 -> 测试"闭环在代码侧的统一主线。
+#
+# 简化约定：
+#   本次落地只记录到二级模块，不逐条罗列每个功能点(REQ)的对应关系，避免映射膨胀。
+#   如需细化到功能点，可在此文件按模块补充 mappings 列表（参照旧版 REQ 级结构）。
+#
+# 维护责任（蓝图 §6.4 阶段4：开发实现）：
+#   开发角色在实现代码、提交 PR / commit 时持续更新本文件。
+#
+# 字段与蓝图 §5.1 的对应关系（按模块聚合）：
+#   模块 -> repo         : repos（前端仓 / 后端仓）
+#   模块 -> page         : pages
+#   模块 -> component    : components（按需）
+#   模块 -> api          : apis（按需）
+#   模块 -> service      : services（按需）
+#   模块 -> PR/commit/tag: repos[].pr / commit / tag（按需）
+#
+# 路径约定：
+#   logical_path 为蓝图逻辑视图路径（便于统一理解 Codes/ 协作视图）
+#   repo_path    为外部代码仓内的物理相对路径
+
+repo_registry:
+  frontend: "repos/frontend-repo"
+  backend: "repos/backend-repo"
+
+# 实际远程仓库（逻辑别名对应的物理仓），便于从映射直接回溯源码。
+git_repos:
+  "repos/frontend-repo":
+    url: "https://git.bgi.com/omics-one/web/omics-web.git"
+    branch: "CORE-v1.6.1"
+    browse: "https://git.bgi.com/omics-one/web/omics-web/-/tree/CORE-v1.6.1"
+  "repos/backend-repo":
+    url: "{待补充}"
+    branch: "{待补充}"
+
+# 项目级聚合：每个二级模块一个 section，便于多模块横向维护与治理角色统一汇总。
+modules:
+
+  # ============ 商业化计费配置（V1.6.1） ============
+  # 来源：Prds/V1.6.1/01-需求文档.md（模块编码主线 CONFIG / BILLCFG）
+  # 前端仓：https://git.bgi.com/omics-one/web/omics-web（分支 CORE-v1.6.1）
+  - path_code: "CONFIG/BILLCFG"
+    path_name: "配置中心/商业化计费配置"
+    leaf_code: "BILLCFG"
+    leaf_name: "商业化计费配置"
+    version: "V1.6.1"
+    repos:
+      - repo: "repos/frontend-repo"
+        scope: "frontend"
+        branch: "CORE-v1.6.1"
+        tag: "{tagName}"        # 按需填写
+    pages:
+      - repo: "repos/frontend-repo"
+        logical_path: "Codes/frontend/src/views/Config/billingConfig"
+        repo_path: "src/views/Config/billingConfig"
+        browse: "https://git.bgi.com/omics-one/web/omics-web/-/tree/CORE-v1.6.1/src/views/Config/billingConfig"
+        note: "模块前端入口（菜单：配置中心 / 商业化计费配置）"
+    # components / apis / services 待详细设计与开发实现后按需补充
+
+  # ============ 新增模块时，复制上面 - path_code 段并修改模块编码 / 路径 ============
