@@ -1,6 +1,6 @@
 ---
 name: playwright-test-implementation
-description: 以需求、测试用例与详细设计文档为主，必要时结合前端代码和失败工件核对实现，生成或维护真实可执行的 Playwright 脚本。
+description: 以需求、测试用例与详细设计文档为主，必要时结合前端代码和失败工件核对实现，生成或维护真实可执行的 Playwright 脚本；脚本就绪后**自动执行测试并生成 AI 总结的模板风格测试报告**（方式 B：由 AI Agent 读取 execution-digest.json 与 report-template-regression.md 产出，无需外部密钥）。
 allowed-tools: Read Glob Grep Edit Write Bash
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Read Glob Grep Edit Write Bash
 
 ## 1. 目标
 
-围绕目标模块输出或维护一套**真实可执行、可回归、可维护**的 Playwright 脚本，覆盖 `Tests/ui/...` 下的 `specs/pages/fixtures/data` 实现，并支持：
+在 `ui-automation-bootstrap` 已产出的骨架（目录 + 含 `data-testid` 定位占位的 page/spec 骨架）基础上，填充真实交互、断言、测试数据与失败修复，输出或维护一套**真实可执行、可回归、可维护**的 Playwright 脚本，覆盖 `Tests/ui-automation/...` 下的 `specs/pages/fixtures/data` 实现，并支持：
 
 - 新模块首轮脚本建设
 - 后续版本迭代下的脚本修改
@@ -19,9 +19,9 @@ allowed-tools: Read Glob Grep Edit Write Bash
 - `03-测试用例文档.md`
 - `01-需求文档.md`
 - `02-详细设计文档.md`（如有，建议提供，可用于补充字段、交互、接口与校验口径）
-- `01c-原型文档.md`（如有）
+- 模块 `data-testid.snapshot.json`（data-testid 知识库快照，提供页面真实可用的稳定定位字典；实现时优先从中取 `testId`，新增/发现的回写）
 - 相关前端页面代码 / 路由信息（必要时用于核对真实实现、定位点与交互逻辑）
-- 目标模块现有 `Tests/ui/...` 自动化目录（如已存在）
+- 目标模块现有 `Tests/ui-automation/...` 自动化目录（如已存在）
 - 失败工件：`junit.xml` / screenshot / `error-context.md` / `trace.zip`（如是修失败场景）
 
 ## 3. 前置检查
@@ -29,7 +29,7 @@ allowed-tools: Read Glob Grep Edit Write Bash
 开始写或改脚本前，先确认：
 
 1. 当前任务属于哪一类：**新模块起步 / 版本迭代 / 失败修复**。
-2. 是否已有可复用目录，以及共享层 `Tests/ui/playwright.config.ts`、`Tests/ui/global-setup.ts`、`Tests/ui/.auth/` 与模块级 `fixtures`。
+2. 是否已有可复用目录，以及共享层 `Tests/ui-automation/playwright.config.ts`、`Tests/ui-automation/global-setup.ts`、`Tests/ui-automation/.auth/` 与模块级 `fixtures`。
 3. 是否已经查看测试页面与系统实际数据；**不要凭空编造机构名、项目名、产品名、状态值、合同编号**。
 4. 需求/详设/后端文案若已明确，文案断言是否应按**完整文案精确匹配**，而不是关键词包含。
 5. 前置数据或权限是否真的不存在；`test.skip(reason)` 应基于**实际页面数据或明确前置条件检查**，不要仅凭脚本作者预设假设直接跳过。
@@ -49,7 +49,7 @@ allowed-tools: Read Glob Grep Edit Write Bash
 1. 从 `03` 中找出适合自动化的 `FT-*`，按功能域拆到 `ATS-*.spec.ts`。
 2. 先补页面对象，再写测试步骤；选择器和交互细节收敛到 `pages/*.page.ts`。
 3. 测试数据统一收敛到 `data/*.data.ts`，避免在 spec 内散落字面量。
-4. 使用 `Tests/ui/global-setup.ts` + `storageState` 复用登录态，避免每条用例重复登录。
+4. 使用 `Tests/ui-automation/global-setup.ts` + `storageState` 复用登录态，避免每条用例重复登录。
 5. 断言优先验证**真实业务结果**，不要只验证 toast 是否出现。
 6. 改动后先回归最小受影响 spec，再决定是否扩大回归范围。
 
@@ -58,6 +58,8 @@ allowed-tools: Read Glob Grep Edit Write Bash
 ### 6.1 选择器优先级
 
 `data-testid` > `getByRole/name` > 稳定属性 > CSS/text 兜底
+
+**data-testid 知识库快照（模块级 `data-testid.snapshot.json`）**：实现 `getByTestId` 时优先从该快照的 `elements` 取 `testId`，并核对 `evidence`（`page-object` / `cli-script` / `intent-only`）；新增或页面新发现的 `data-testid` 应回写快照 `elements` 并将 `evidence` 升级，同时刷新 `gaps`。快照以 `02-详细设计文档.md` §7 为设计意图主源，页面实际存在性以浏览器探索验证为准（验证后标记 `evidence: page-verified`）。
 
 ### 6.2 页面对象职责
 
@@ -68,12 +70,12 @@ allowed-tools: Read Glob Grep Edit Write Bash
 ### 6.3 夹具约定
 
 - 默认使用已登录 `authedPage`。
-- 认证态统一由 `Tests/ui/global-setup.ts` 生成，并通过 `storageState` 复用到 `Tests/ui/.auth/`。
+- 认证态统一由 `Tests/ui-automation/global-setup.ts` 生成，并通过 `storageState` 复用到 `Tests/ui-automation/.auth/`。
 - 非鉴权本身的用例，不要在 `beforeEach` 里重新走登录流程。
 
 ## 7. 数据与环境约定
 
-- 环境地址、账号、密码统一走 `Tests/ui/.env` / `Tests/ui/.env.example`。
+- 环境地址、账号、密码统一走 `Tests/ui-automation/.env` / `Tests/ui-automation/.env.example`。
 - **禁止**在脚本中硬编码 `baseURL`、用户名、密码、验证码处理参数。
 - 测试数据要基于系统已有数据编写；需要真实新增数据时，要明确其对后续回归的影响。
 - 修改型场景必须确保形成**真实变更**，避免“写回原值”导致伪失败。
@@ -228,3 +230,48 @@ await billingPage.expectToast("保存成功");
 - 写操作场景是否考虑了数据清理、隔离或唯一标识，避免污染后续用例。
 - 是否先回归了最小影响范围，并保留失败工件。
 - 是否没有引入与当前需求无关的重构。
+- 是否把新增/变更的 `data-testid` 回写到了模块 `data-testid.snapshot.json`（而非仅分散在 page 对象）。
+
+## 13. 执行与 AI 报告生成（技能默认必做收尾）
+
+**使用本技能时，脚本就绪后必须自动完成「执行测试 → 产出 digest → 生成 AI 模板报告」三步，缺一不可。** 默认走**方式 B（AI Agent 生成）**——无需任何外部密钥，由当前会话的 AI 直接基于执行结果产出 `report-template.md` 风格的可读回归报告。
+
+### 13.1 一键执行 + 产出 digest（单一入口）
+
+```powershell
+# 技能内默认调用此命令：跑测试 + 产出机械报告 + execution-digest.json
+node run-report.mjs --domain <一级模块> [--module <二级模块>]
+# 等价 npm scripts：
+npm run test:report -- --domain <一级模块> [--module <二级模块>]
+```
+
+- `run-report.mjs` 内部依次执行 `run.mjs`（产出 `junit.xml` + 截图/trace 工件）与 `gen-report.mjs`（产出 `TEST-REPORT.md` 机械版 + `execution-digest.json`）。
+- 测试执行失败（退出码非 0）时不生成报告，需先按 §10 修复。
+
+### 13.2 结构化 digest（AI 报告主数据源）
+
+`gen-report.mjs` 产出的 `execution-digest.json` 含：每用例状态 / 耗时 / 失败信息 / 关联截图与 `trace.zip` 相对路径。**AI 生成报告时直接读它，不解析 XML、不臆造数据。**
+
+### 13.3 生成 AI 总结报告（默认方式 B：Agent 直接生成）
+
+执行完 §13.1 后，**AI Agent（即当前会话中的你）必须立即**读取以下输入并写入最终 `TEST-REPORT.md`（覆盖机械版）：
+
+- 输入：`execution-digest.json` + `Tests/ui-automation/report-template-regression.md` + 失败工件（截图 / `trace.zip` / `error-context.md`）。
+- 步骤：
+  1. 读 `execution-digest.json`，填充概述 / 指标 / 用例明细表；
+  2. 对每个失败用例，读其关联截图与 trace，**判定根因只归为 `ENV / DATA / SCRIPT / DEFECT / CHANGE` 五类之一**，撰写备注（预期 vs 实际、DOM 状态、修复建议、附截图/trace 路径）；
+  3. 汇总确认缺陷 `BUG-*`、待确认问题 `ISSUE-*`、脚本待优化 `OPT-*`；
+  4. 撰写「AI 执行总结」与「结论与建议」。
+- 输出：`test-reports/<一级模块>/<二级模块|all-modules>/TEST-REPORT.md`。
+
+### 13.4 可选方式 A · 脚本内调 LLM（CI 用）
+
+若需在流水线里全自动、不走 Agent，可配置 `AI_REPORT_BASE_URL` + `AI_REPORT_API_KEY`（可选 `AI_REPORT_MODEL`）后：
+
+```powershell
+node gen-report.mjs --domain <一级模块> [--module <二级模块>] --ai
+```
+
+脚本直接调用 LLM 按模板生成报告；未配密钥或调用失败时自动回退机械报告（并提示由 Agent 生成）。**日常使用本技能默认走 §13.3，不依赖此方式。**
+
+> 失败归因五类与 §8 / §12.5 一致：`ENV`（环境/配置）· `DATA`（测试数据/前置条件）· `SCRIPT`（脚本/定位/断言）· `DEFECT`（真实功能缺陷）· `CHANGE`（需求或页面变更致脚本失效）。

@@ -8,11 +8,12 @@ allowed-tools: Read Glob Grep Edit Write
 
 ## 1. 目标
 
-围绕目标模块输出一套可直接起步的 UI 自动化骨架方案，服务 `Tests/ui-automation/...` 目录建设和 Playwright 脚本起步。
+在项目**决定采用 Playwright 做 UI 自动化测试**时触发，围绕目标模块输出一套可直接起步的 **UI 自动化骨架方案**（目录结构 + 文件清单 + 含 `data-testid` 定位占位的 page/spec 骨架），服务 `Tests/ui-automation/...` 目录建设和后续脚本实现；骨架确认后，由 `playwright-test-implementation` 接手完成具体脚本编写。
 
 ## 2. 适用输入
 
 - `02-详细设计文档.md`（含 §7 `data-testid` 清单，是 UI 自动化稳定定位字典的直接输入）
+- 模块 `data-testid.snapshot.json`（data-testid 知识库快照：§7 intent + 脚本引用证据 `evidence` + 缺口清单 `gaps`；bootstrap 时读取，定位 page 对象未覆盖项）
 - `03-测试用例文档.md`
 - `01-需求文档.md`
 - 页面路径 / 路由信息
@@ -35,7 +36,7 @@ allowed-tools: Read Glob Grep Edit Write
 2. 结合页面结构与原型说明，建议脚本拆分方式。
 3. 输出 `ATS-*.spec.ts` 命名建议。
 4. 输出页面对象、夹具、数据文件的最小清单。
-5. 标记对前端可测性要求，如 `data-testid`；**实际 `data-testid` 以 `02-详细设计文档.md` §7 清单为准**，缺失时再要求前端补充。
+5. 根据 `02-详细设计文档.md` §7 的 `data-testid` 清单与模块 `data-testid.snapshot.json`，**顺带把已定义的 `data-testid` 直接写进 page 对象 / spec 骨架的定位占位**（用 `getByTestId(...)`），让骨架一开始就基于稳定定位；仅当 §7 也未定义某交互所需定位时，才标记该处需前端补充 `data-testid`。
 6. **生成测试数据前，先访问测试页面查看系统已有数据**（机构名、项目名、状态值等），基于实际数据编写，不要凭空编造。
 
 ## 5. 目录结构建议
@@ -78,6 +79,7 @@ Tests/
 │   │   │   ├── fixtures/billing.fixture.ts   # 消费 Tests/shared/.auth 登录态
 │   │   │   ├── data/billing.data.ts
 │   │   │   ├── snapshots/
+│   │   │   ├── data-testid.snapshot.json   # data-testid 知识库快照（设计意图+脚本覆盖+缺口）
 │   │   │   └── README.md
 │   │   └── <其他二级模块>/
 │   └── <其他一级模块>/
@@ -125,6 +127,7 @@ Tests/
 | `fixtures/*.fixture.ts` | 模块夹具，封装模块级上下文与扩展能力 | ✅   |
 | `data/*.data.ts`        | 测试数据集中管理（基于系统已有数据） | ✅   |
 | `snapshots/`            | 模块级快照或对比工件                 | 按需 |
+| `data-testid.snapshot.json` | data-testid 知识库快照：§7 intent + 脚本覆盖证据 + 缺口清单 | 按需 |
 | `README.md`             | 模块说明、运行方式、前置条件         | ✅   |
 
 ## 7. 输出格式建议
@@ -159,7 +162,7 @@ Tests/
 
 ### 8.3 何时移交给下一个 skill
 
-当任务进入以下任一场景时，应切换到 `playwright-test-implementation`：
+本 skill 只产出**骨架**（目录 + 文件清单 + 含 `data-testid` 定位占位的 page/spec 骨架）。**用户确认骨架（尤其定位点是否正确）后**，再切换到 `playwright-test-implementation` 填充真实交互、断言、测试数据与失败修复：
 
 - 需要生成真实可执行的 Playwright 脚本代码
 - 需要补齐页面对象、夹具、测试数据与断言逻辑
@@ -176,6 +179,7 @@ Tests/
 - **禁止每个测试用例单独登录**，必须复用 `Tests/shared/.auth/<一级模块>/domain-state.json` 认证态（UI 由 `globalSetup` 生成、接口由 `storageState` 消费）。
 - **禁止用 `networkidle` 作为主要等待手段**，改用 DOM 元素可见性断言。
 - **选择器必须优先使用 `data-testid`**（实际取值以 `02-详细设计文档.md` §7 清单为准），缺失时要求前端补充，而非直接用脆弱的 CSS class 或文本定位。
+- **data-testid 定位占位在骨架阶段就落位**：bootstrap 生成骨架时，直接把 `02-详细设计文档.md` §7 / `data-testid.snapshot.json` 中**已定义**的 `data-testid` 作为稳定定位写进 page 对象与 spec 骨架（用 `getByTestId(...)`），不凭空猜、不空壳留待后面；只有 §7 确实缺失的定位才标记推前端补充。骨架本身不实现真实交互/断言/数据，那属于 `playwright-test-implementation` 职责。
 - **测试数据必须基于系统已有数据编写**，先访问页面查看实际值（机构名、项目名、产品名、状态值等），不要凭空编造。
 - **依赖统一安装在 `Tests/` 级**（`Tests/package.json` 单一来源），不要在 `Tests/ui-automation`、`Tests/api-automation` 下重复 `npm install`。
 - **登录态与鉴权 helper 统一放 `Tests/shared/`**，供 UI 与接口共用；**UI 自己的 `playwright.config.ts`、`global-setup.ts`、`.env`、公共脚本放 `Tests/ui-automation/`**，不要为每个二级模块重复放置一套。

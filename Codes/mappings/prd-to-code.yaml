@@ -58,8 +58,10 @@ modules:
       - repo: "repos/frontend-repo"
         logical_path: "Codes/frontend/src/views/Config/billingConfig"
         repo_path: "src/views/Config/billingConfig"
+        route: "/config/billingConfig"
+        menu: "配置中心 / 商业化计费配置"
         browse: "https://git.bgi.com/omics-one/web/omics-web/-/tree/CORE-v1.6.1/src/views/Config/billingConfig"
-        note: "模块前端入口（菜单：配置中心 / 商业化计费配置）"
+        note: "模块前端入口（路由 /config/billingConfig；菜单：配置中心 / 商业化计费配置）"
     # components / apis / services 待详细设计与开发实现后按需补充
 
   # ============ 新增模块时，复制上面 - path_code 段并修改模块编码 / 路径 ============

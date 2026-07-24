@@ -261,16 +261,26 @@ AI 不应直接做：
 - 在没有需求依据时发明断言
 - 绕过定位规范乱写选择器
 
-### 7.4 已落地的两个 skill（项目级执法规范）
+### 7.4 已落地的三个 skill（项目级执法规范）
 
-本方案在 V1.6.1 试点中已沉淀两个 skill，分别对应「探索式功能验证」与「确定性回归脚本」两条路线，二者互补、共用同一套编号与目录：
+本方案在 V1.6.1 试点中已沉淀三个 skill，可组合为「两种协同方案」，二者互补、共用同一套编号与目录，并以 `data-testid` 知识库快照（详见 §14.3）为共享定位资产：
+
+#### 方案 A：骨架先行 → 实现填充（确定性回归路线）
+
+| 阶段 | skill | 谁做判断 | 核心产出 |
+| --- | --- | --- | --- |
+| 1. 定骨架 | `ui-automation-bootstrap` | 触发于"项目决定采用 Playwright 做 UI 自动化" | 目录结构 + 含 `data-testid` 定位占位的 page/spec 骨架 |
+| 2. 填脚本 | `playwright-test-implementation` | 预写 `expect` 断言、机器执行 | 可执行 `ATS-*.spec.ts` + `junit.xml` / trace |
+
+> 顺序：bootstrap 先出骨架（`02-详细设计文档.md` §7 的 `data-testid` 直接落位成 `getByTestId` 占位）→ **用户确认骨架** → implementation 在骨架基础上填充真实交互 / 断言 / 数据。
+
+#### 方案 B：探索驱动（playwright-cli-testing）
 
 | skill | 路线定位 | 谁做判断 | 适用阶段 | 核心产出 |
 | --- | --- | --- | --- | --- |
-| `playwright-cli-testing` | 探索式功能验证（AI 当驾驶员） | AI Agent 实时驱动（~920K Token） | 首轮摸底、需求/用例可行性验证、缺陷探查 | 功能测试报告（含截图留证） |
-| `playwright-test-implementation` | 确定性回归脚本（人写断言） | 预写 `expect` 断言、机器执行 | 正式回归、版本迭代、失败修复 | 可执行 `ATS-*.spec.ts` + `junit.xml` / trace |
+| `playwright-cli-testing` | 探索式功能验证（AI 当驾驶员，official playwright-cli skill 的**项目增强层**） | AI Agent 实时驱动（~920K Token） | 首轮摸底、需求/用例可行性验证、缺陷探查、独立自测用例 | 功能测试报告（含截图留证）；探索阶段维护 `data-testid` 快照 |
 
-> 两个 skill 的关系即 §2「确定性优先、AI 辅助」的具体落地：cli 先探索验证可行性，test 再固化为确定性回归。其约束细则见 §12。
+> 方案 A 与 B 的关系即 §2「确定性优先、AI 辅助」的具体落地：B 先探索验证可行性并沉淀稳定定位，A 再把验证过的定位固化成确定性回归。三 skill 的执法细则见 §12，两方案的协作时序、使用场景与端到端过程见 §14。
 
 ---
 
@@ -356,7 +366,7 @@ UI 自动化失败建议统一分 5 类：
 6. 执行报告输出规范（双路线：cli 截图 + test `junit.xml`/trace）
 7. 失败分类与回填规则
 8. 与需求编号的映射关系
-9. 两个 skill 执法规范（`playwright-cli-testing` / `playwright-test-implementation`）
+9. 三 skill / 两方案执法规范（`ui-automation-bootstrap` / `playwright-cli-testing` / `playwright-test-implementation`）
 
 ---
 
@@ -380,7 +390,7 @@ UI 自动化一期推荐路线不变：
 
 > 以下约束来自 V1.6.1 试点实际使用的两个 skill 规范，是 §7.4 的落地细则。凡建脚本/跑用例，必须遵循。
 
-### 12.1 定位优先级（两 skill 统一）
+### 12.1 定位优先级（三 skill 统一）
 
 1. `getByTestId`（第一优先，依赖详设 §7 的 `data-testid` 清单）
 2. `getByRole + name`
@@ -411,6 +421,12 @@ UI 自动化一期推荐路线不变：
 
 - 失败统一分 `ENV / DATA / SCRIPT / DEFECT / CHANGE` 五类。
 - 报告/执行记录回填到 `Prds/<版本>/04-测试执行记录.md`、`05-变更记录.md`、`TRACE.yaml`。
+
+### 12.6 `ui-automation-bootstrap` 骨架约束
+
+- 仅产出骨架（目录结构 + 含 `data-testid` 定位占位的 page/spec 骨架），**不实现**真实交互 / 断言 / 数据（那属于 `playwright-test-implementation` 职责）。
+- 骨架生成时**顺带**把 `02-详细设计文档.md` §7 / `data-testid.snapshot.json` 中已定义的 `data-testid` 写成 `getByTestId(...)` 占位，不凭空猜、不空壳留待后面；仅 §7 确实缺失的定位才标记推前端补。
+- **用户确认骨架（尤其定位点是否正确）后**，再移交 `playwright-test-implementation` 填充真实脚本。
 
 ---
 
@@ -449,3 +465,140 @@ UI 自动化一期推荐路线不变：
 3. test 脚本应强化表单链路的 toast 等待与校验顺序断言，对齐 cli 已验证范围。
 4. 补造测试数据（分页、CONFIRMED 消耗记录等），消除 skip / 条件不满足用例。
 5. 两路线共用同一 `data-testid` 字典，需与详设 §7 保持同步更新机制。
+
+---
+
+## 14. 两种协同方案、使用场景与落地流程
+
+§7.4 已明确三个 skill 可组合为「两种协同方案」。本节给出两种方案的完整定义、使用场景对照，以及一条端到端使用过程示例（以 V1.6.1「商业化计费配置」BILLCFG 为例串起来）。两方案以 `data-testid` 知识库快照为共享定位资产，闭环复用。
+
+### 14.1 方案 A：骨架先行 → 实现填充（确定性回归路线）
+
+**适用前提**：项目已决定采用 Playwright 做 UI 自动化，目标是可回归、可维护的确定性脚本。
+
+| 阶段 | skill | 谁做判断 | 输入 | 核心产出 |
+| --- | --- | --- | --- | --- |
+| 1. 定骨架 | `ui-automation-bootstrap` | 触发于"项目决定采用 Playwright 做 UI 自动化" | `01-需求文档.md` / `03-测试用例文档.md`、`02-详细设计文档.md`（含 §7 `data-testid` 清单）、模块 `data-testid.snapshot.json` | 目录结构（含 `specs/fixtures/data/pages/snapshots/README.md`）+ page/spec **骨架** |
+| 2. 填脚本 | `playwright-test-implementation` | 预写 `expect` 断言、机器执行 | 上一步骨架 + 探索回填的快照 | 可执行 `ATS-*.spec.ts` + `junit.xml` / trace |
+
+**关键约定**：
+- bootstrap 在骨架里**顺带把 §7 / 快照已定义的 `data-testid` 写成 `getByTestId(...)` 占位**，不必凭空猜；仅当 §7 确实缺失某定位时，才标记推前端补 `data-testid`。骨架本身不实现真实交互 / 断言 / 数据。
+- **用户先确认骨架**（尤其定位点是否准确、目录是否符合预期），再移交 implementation。
+- implementation 在骨架基础上填充真实交互、`expect` 断言、测试数据与夹具；新增 / 发现的 `data-testid` 回写 `data-testid.snapshot.json`。
+
+### 14.2 方案 B：探索驱动（playwright-cli-testing）
+
+**定位**：official playwright-cli skill 的**项目增强层**，聚焦快速功能验证 / 首次功能验证 / 探索摸底。支持两种核心场景：
+
+- **场景 1 · 独立运行自测用例**：直接以 AI 为驾驶员，对照需求 / 用例跑通功能、产出含截图留证的功能测试报告（如 V1.6.1 的 cli 探索式报告）。
+- **场景 2 · 探索与验证支撑**：配合 bootstrap + implementation，只探页面、确认 `data-testid` 真实存在、维护 `data-testid.snapshot.json`（`page-verified` / `missingInPage` / `extraInPage` 闭环），不产正式脚本。
+
+**其他约束**：判定基于 DOM（截图仅留证、不喂模型当判定）；每个用例必截全屏图；数据用完即清理。详见 §12.3。
+
+### 14.3 共享资产：data-testid 知识库快照
+
+- **落点**：`Tests/ui-automation/<一级模块>/<二级模块>/data-testid.snapshot.json`（如 `CONFIG-配置中心/BILLCFG-商业化计费配置/data-testid.snapshot.json`）。
+- **角色分工**：bootstrap **消费** intent 生成骨架；implementation / cli **生产 / 回写** actual。是三 skill 共享的复用闭环资产——下一模块直接复用、定位漂移自动进 `gaps`、回推前端或回填 §7。
+- **Schema（关键字段，支持无 `data-testid` 探索）**：
+  - `elements[]`: `{ testId, req, component, usage, kind, hasDataTestId?: boolean, evidence, actual?: { exists, selector } }`
+    - `selector` 可为 `getByTestId(...)` 或兜底定位（无 testid 时记稳定下位器）；
+    - `evidence` ∈ `page-object` / `cli-script` / `intent-only` / `page-verified`；
+    - `hasDataTestId` 显式标记该元素页面是否挂了 `data-testid`。
+  - `gaps.missingInPage`: §7 设计有、页面无（或未挂 testid）→ 推前端补，条目可带 `{ testId, suggestedSelector, reason }`。
+  - `gaps.extraInPage`: 页面有、§7/快照无 → 回填 §7 与快照，建议带 `selector`。
+  - `gaps.notCoveredByPageObject`: 设计有但 page 对象未封装 / 未验证项。
+- 完整示例见 `BILLCFG-商业化计费配置/data-testid.snapshot.json`；无 testid 时的兜底与输出细则见 §14.7。
+
+### 14.4 使用场景对照
+
+| 使用场景 | 推荐方案 | 说明 |
+| --- | --- | --- |
+| 新模块首次接入 Playwright，需要可回归脚本 | A（bootstrap → implementation） | 骨架先把稳定定位落位，避免从零猜 |
+| 需求 / 用例可行性先摸底、缺陷探查 | B（cli 独立自测） | 快速出结论，不纠结脚本工程化 |
+| 页面改版 / 新功能，需探清真实 `data-testid` | B（cli 探索支撑）+ A | cli 探清后回填快照，bootstrap / implementation 复用 |
+| 版本迭代回归门禁 | A 的 implementation 阶段 | 跑确定性 `ATS-*.spec.ts` |
+| 失败修复验证 | A 的 implementation 阶段 | 结合 trace / junit 修 |
+| 一次性临时验证、不想写正式脚本 | B（cli 独立自测） | 截图留证即可 |
+
+### 14.5 端到端使用过程示例（以 BILLCFG 商业化计费配置为例）
+
+```text
+① 决定用 Playwright 测 BILLCFG（项目采用 UI 自动化）
+      ↓
+② 触发 ui-automation-bootstrap（方案 A 阶段 1）
+   - 读 02-详细设计文档.md §7（25 个 data-testid 清单）
+   - 读 data-testid.snapshot.json（首份 KB：13 page-object / 4 cli-script / 8 intent-only）
+   - 产出：CONFIG-配置中心/BILLCFG-商业化计费配置/ 目录 + *.page.ts / *.spec.ts 骨架
+          骨架内把已定义 data-testid 写成 getByTestId('billing-page-title') 等占位
+   - 仅 8 个 intent-only 且无代码引用的 data-testid 标记"待页面确认 / 推前端补"
+      ↓
+③ 用户确认骨架（定位点是否准确、目录是否要调整）
+      ↓
+④ 触发 playwright-test-implementation（方案 A 阶段 2）
+   - 在骨架基础上填真实交互 + expect 断言 + 测试数据
+   - 探索中新发现的 data-testid 回写 data-testid.snapshot.json（evidence → page-verified）
+   - 跑 node run.mjs --domain CONFIG --module BILLCFG → junit.xml + trace
+      ↓
+⑤ （并行 / 前期）playwright-cli-testing 探索支撑（方案 B 场景 2）
+   - 用 snapshot 打开页面，把真实 data-testid 与 §7 / 快照比对
+   - page-verified 升级；missingInPage 回推前端；extraInPage 回填 §7 与快照
+      ↓
+⑥ 失败归因（ENV / DATA / SCRIPT / DEFECT / CHANGE）
+   → 回填 04-测试执行记录.md / 05-变更记录.md / TRACE.yaml
+      ↓
+⑦ 下一模块复用 KB：bootstrap 直接读快照拿稳定定位，只补差异
+```
+
+> 该过程已在 V1.6.1「商业化计费配置」试点闭环（见 §13）：cli 探索暴露口径问题、test 回归固化脚本、快照作为共享定位资产沉淀。方案 B 也可独立成「cli 直接出功能测试报告」闭环（对应 §13.1 的 cli 探索式 39 用例）。
+
+### 14.6 三个 skill 的触发场景
+
+| skill | 什么情况下触发 | 不触发 / 移交给谁 |
+| --- | --- | --- |
+| `ui-automation-bootstrap` | 项目**决定采用 Playwright 做 UI 自动化**、且目标模块尚无目录/骨架时触发。典型：新模块首次接入、版本迭代要扩建新子模块 | 已有现成骨架则直接进 implementation；纯探索验证不走 bootstrap |
+| `playwright-cli-testing` | 任一成立即触发：①需快速/首次功能验证、缺陷探查（独立自测，场景一）；②bootstrap/implementation 前需探清页面结构与真实 `data-testid`（探索支撑，场景二）；③不想写正式脚本的一次性临时验证 | 要产出可回归确定性脚本时移交 implementation；已沉淀的定位交给 bootstrap/implementation 复用 |
+| `playwright-test-implementation` | 骨架已确认（bootstrap 产出并经用户确认）后触发；或既有脚本的版本增量修改、失败修复 | 尚无骨架时先触发 bootstrap；只验证可行性不写脚本时走 cli 场景一 |
+
+**触发链总览**：
+
+```text
+新模块接入  → bootstrap（定骨架，data-testid 落位）→ 用户确认骨架 → implementation（填真实脚本）
+                                                          ↑ 并行：cli 场景二探索支撑补 data-testid 快照
+纯可行性/缺陷探查 → cli 场景一（独立自测报告，不写正式脚本）
+改版/新功能探清定位 → cli 场景二（探清 + 回填快照）→ bootstrap / implementation 复用快照
+版本回归门禁 / 失败修复 → implementation（跑确定性 ATS-*.spec.ts）
+```
+
+### 14.7 回归报告：让 AI 总结并输出模板风格报告
+
+`playwright-test` 跑完后，除机械统计版 `TEST-REPORT.md` 外，还可让 AI 基于结构化 `execution-digest.json`（由 `gen-report.mjs` 从 `junit.xml` + 失败工件路径解析产出）与 `report-template-regression.md` 模板，生成 `report-template.md` 风格的可读回归报告：含概述/指标/用例明细/非通过备注（根因归入 `ENV/DATA/SCRIPT/DEFECT/CHANGE`）/缺陷汇总/AI 执行总结/结论。**两种触发**：① 配置 `AI_REPORT_BASE_URL/API_KEY` 后 `node gen-report.mjs --ai`（脚本内调 LLM）；② 在 CodeBuddy 会话中由 AI Agent 直接读取 digest 与模板产出（无需密钥，推荐）。详见 `playwright-test-implementation` SKILL §13 与 `Tests/ui-automation/README.md` 场景 J。
+
+### 14.8 无 data-testid 时的探索结果输出
+
+cli 探索支撑时，页面**不一定**带 `data-testid`（老页面、未接 §7 规范的模块很常见）。此时不能卡在"等 data-testid"，而应**用稳定兜底下位器完成探索，并把结果结构化输出**，供后续推前端补或作为临时定位字典。
+
+**兜底定位优先级**（与 §12.1 一致，顺序后移）：
+
+1. `getByRole(role, { name })` —— 语义最稳，优先
+2. `locator` + 稳定属性（`aria-label` / `name` / 含业务语义的 class 如 `.el-dialog__title`）
+3. 文本精确：`getByText` / `hasText`
+4. 最后才用脆弱 CSS 路径（仅当无其他选择）
+
+**探索结果输出（两种产物，可并存）**：
+
+1. **回写 `data-testid.snapshot.json`（主体产物）**——按 §14.3 扩展 schema：
+   - §7 设计有、页面无 `data-testid` → 保留该 `testId`，`hasDataTestId:false`，`actual.selector` 记兜底定位，`evidence:page-verified`，并加入 `gaps.missingInPage`（带 `suggestedSelector`）；
+   - 页面有、§7/快照无 → 加入 `elements`（或 `gaps.extraInPage` 增强为对象）并记 `actual.selector`，建议回填 §7。
+2. **产出 `探索结果清单.md`（探索支撑专用报告）**——当模块 testid 普遍缺失或尚无快照时，输出一张表存 `snapshots/`：
+
+| 元素语义/用途 | 是否含 data-testid | 页面实际稳定定位（兜底） | 建议 |
+| --- | --- | --- | --- |
+| 新增计费方案按钮 | 否 | `getByRole('button', { name: '新增计费方案' })` | 推前端补 `data-testid=billing-add-tenant-btn` |
+| 保存按钮 | 否 | `locator('.el-dialog__footer button.is-primary')` | 临时可用；建议补 testid |
+| 合同编号输入框 | 是 | `getByTestId('billing-contract-no-input')` | 已稳定，直接复用 |
+
+**输出原则**：
+
+- 判定仍基于 DOM（截图仅留证）；文案 / 状态在 JS 内精确比对。
+- 无 testid 的兜底定位**标注脆弱度**（role/aria 稳定 > 业务 class 稳定 > 纯结构 CSS 脆弱），便于 implementation 决定临时用还是推前端补。
+- 探索结果清单与快照统一进模块 `snapshots/`，作为 bootstrap/implementation 的临时定位字典；一旦前端补上 `data-testid`，cli 再次探索即把 `hasDataTestId` 翻 true、`actual.selector` 切回 `getByTestId`。

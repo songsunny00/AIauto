@@ -9,8 +9,15 @@
  * 用法：
  *   node gen-report.mjs --domain CONFIG-配置中心
  *   node gen-report.mjs --domain CONFIG-配置中心 --module BILLCFG-商业化计费配置
+ *   node gen-report.mjs --domain CONFIG-配置中心 --module BILLCFG-商业化计费配置 --ai
  *
- * 输出：test-reports/<一级模块>/<二级模块|all-modules>/TEST-REPORT.md
+ * 输出：
+ *   test-reports/<一级模块>/<二级模块|all-modules>/TEST-REPORT.md        （Markdown 报告）
+ *   test-reports/<一级模块>/<二级模块|all-modules>/execution-digest.json （结构化执行结果，供 AI 生成报告）
+ *
+ * `--ai`：若配置了 `AI_REPORT_BASE_URL` + `AI_REPORT_API_KEY`，则调用 LLM 基于
+ *         `report-template-regression.md` 模板生成报告；否则回退机械报告，并提示
+ *         在 CodeBuddy 中由 AI Agent 基于 digest 与模板生成（无需额外密钥）。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -19,11 +26,12 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
-  const a = { domain: "", module: "" };
+  const a = { domain: "", module: "", ai: false };
   for (let i = 0; i < argv.length; i++) {
     const x = argv[i];
     if (x === "--domain" || x === "-d") a.domain = argv[++i] ?? "";
     else if (x === "--module" || x === "-m") a.module = argv[++i] ?? "";
+    else if (x === "--ai") a.ai = true;
   }
   return a;
 }
@@ -55,6 +63,66 @@ function attrs(str) {
   const re = /(\w+)="([^"]*)"/g;
   while ((m = re.exec(str))) o[m[1]] = m[2];
   return o;
+}
+
+// 递归收集 artifacts 目录下的截图 / trace / 视频，并记录其直接父目录名
+// （Playwright 把每个用例的工件放在“以用例命名的子目录”内，需用父目录名关联用例）
+function scanArtifacts(dir) {
+  const items = [];
+  if (!fs.existsSync(dir)) return items;
+  const walk = (p) => {
+    for (const ent of fs.readdirSync(p, { withFileTypes: true })) {
+      const fp = path.join(p, ent.name);
+      if (ent.isDirectory()) {
+        walk(fp);
+        continue;
+      }
+      const lower = ent.name.toLowerCase();
+      const isShot = /\.(png|jpe?g|gif|webp)$/.test(lower);
+      const isTrace = /\.(zip|trace)$/.test(lower);
+      const isVideo = /\.(webm|mp4|ogv)$/.test(lower);
+      if (isShot || isTrace || isVideo) {
+        items.push({
+          file: fp,
+          parent: path.basename(p),
+          kind: isShot ? "screenshots" : isTrace ? "traces" : "videos",
+        });
+      }
+    }
+  };
+  walk(dir);
+  return items;
+}
+
+// 调用 OpenAI 兼容的 Chat Completions 端点生成模板报告；无密钥/失败时返回 null
+async function callAI(digestText, templateText) {
+  const base = process.env.AI_REPORT_BASE_URL;
+  const key = process.env.AI_REPORT_API_KEY;
+  const model = process.env.AI_REPORT_MODEL || "gpt-4o-mini";
+  if (!base || !key) return null;
+  const url = base.replace(/\/$/, "") + "/chat/completions";
+  const sys =
+    "你是资深测试报告分析师。基于给定的结构化执行结果(digest)与回归测试报告模板，输出最终 Markdown 测试报告。" +
+    "规则：1) 不要编造用例或数据，所有数字来自 digest；2) 失败用例根因只归为 ENV/DATA/SCRIPT/DEFECT/CHANGE 之一；" +
+    "3) 对失败用例给出预期vs实际、DOM状态、修复建议，并附 digest 中的截图/trace 相对路径；" +
+    "4) 严格使用模板的章节结构，填满 {{占位}}，保留中文表头。";
+  const user =
+    `【报告模板】\n${templateText}\n\n【执行结果 digest】\n${digestText}\n\n请输出最终报告 Markdown（不要包裹代码块标记）。`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ],
+      temperature: 0.2,
+    }),
+  });
+  if (!resp.ok) throw new Error(`LLM HTTP ${resp.status}`);
+  const j = await resp.json();
+  return j?.choices?.[0]?.message?.content || null;
 }
 
 // 顶层 testsuites 汇总
@@ -193,10 +261,80 @@ if (skippedCases.length) {
   md += `\n`;
 }
 
+// ---- 结构化 digest（供 AI 生成报告 / Agent 读取） ----
+const artifactsDir = path.join(base, "artifacts");
+const artifactsAll = scanArtifacts(artifactsDir);
+const norm = (s) => String(s).toLowerCase().replace(/[\s_/\\:.-]/g, "");
+function matchArtifacts(fileBase, title) {
+  // Playwright 工件目录名形如 “…-<用例核心描述>-chromium”，而 digest 的 title 带
+  // “PT-BILLCFG-001: ” 这类编号前缀。取冒号后的核心描述做关联，归一化时一并去掉 : . -
+  const core = norm(title.split(":").slice(1).join(":"));
+  const fN = norm(fileBase);
+  const pick = (kind) =>
+    artifactsAll
+      .filter(
+        (it) =>
+          it.kind === kind &&
+          ((core && norm(it.parent).includes(core)) ||
+            norm(it.parent).includes(fN)),
+      )
+      .map((it) => path.relative(__dirname, it.file).split(path.sep).join("/"));
+  return { screenshots: pick("screenshots"), traces: pick("traces"), videos: pick("videos") };
+}
+const digest = {
+  meta: {
+    reportName,
+    generatedAt: now,
+    domain: args.domain,
+    module: args.module || null,
+    baseUrl: envBase || "(未配置)",
+    browser: channel,
+    playwright: pwVer,
+    totals: { tests: totalTests, pass: totalPass, fail: totalFail, skip: totalSkip, error: totalErr, time: totalTime },
+  },
+  suites: suites.map((s) => ({
+    file: s.file,
+    tests: s.tests,
+    pass: s.tests - s.failures - s.skipped - s.errors,
+    fail: s.failures,
+    skip: s.skipped,
+    error: s.errors,
+    time: s.time,
+    cases: s.cases.map((c) => ({ ...c, artifacts: matchArtifacts(s.file, c.title) })),
+  })),
+};
+const digestPath = path.join(base, "execution-digest.json");
+fs.writeFileSync(digestPath, JSON.stringify(digest, null, 2), "utf8");
+console.log(`[gen-report] 已生成结构化 digest: ${path.relative(__dirname, digestPath)}`);
+
+// ---- --ai：调用 LLM 生成模板风格报告（无密钥时回退机械报告） ----
+if (args.ai) {
+  const tplPath = path.join(__dirname, "report-template-regression.md");
+  const tpl = fs.existsSync(tplPath) ? fs.readFileSync(tplPath, "utf8") : "";
+  try {
+    const aiMd = await callAI(JSON.stringify(digest, null, 2), tpl);
+    if (aiMd) {
+      fs.writeFileSync(path.join(base, "TEST-REPORT.md"), aiMd, "utf8");
+      console.log(`[gen-report] AI 报告已生成: test-reports/${args.domain}/${args.module || "all-modules"}/TEST-REPORT.md`);
+      console.log(
+        `[gen-report] 总用例 ${totalTests} | 通过 ${totalPass} | 失败 ${totalFail} | 跳过 ${totalSkip} | 错误 ${totalErr} | 耗时 ${totalTime.toFixed(2)}s`,
+      );
+      process.exit(0);
+    }
+  } catch (e) {
+    console.warn(`[gen-report] AI 调用失败（${e.message}），回退机械报告`);
+  }
+}
+
 md += `## 五、产物位置\n\n`;
 md += `- JUnit 原始结果：\`${path.relative(__dirname, junitPath)}\`\n`;
 md += `- HTML 报告：\`test-reports/${args.domain}/${args.module || "all-modules"}/html/index.html\`\n`;
 md += `- 失败截图/视频/trace：\`test-reports/${args.domain}/${args.module || "all-modules"}/artifacts/\`\n`;
+
+if (args.ai) {
+  md += `\n> 注：已传入 \`--ai\` 但未检测到 \`AI_REPORT_BASE_URL\` / \`AI_REPORT_API_KEY\`，未调用 LLM。\n`;
+  md += `> 可在 CodeBuddy 会话中由 AI Agent 读取 \`execution-digest.json\` + \`report-template-regression.md\` 生成 AI 总结版报告。\n`;
+}
 
 const outPath = path.join(base, "TEST-REPORT.md");
 fs.writeFileSync(outPath, md, "utf8");

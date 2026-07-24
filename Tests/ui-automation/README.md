@@ -176,20 +176,29 @@ TEST_DOMAIN_PATH=CONFIG-配置中心 TEST_MODULE_PATH=BILLCFG-商业化计费配
 
 ### 场景 J：生成 Markdown 测试报告
 
-测试跑完后，用 `gen-report.mjs` 把 Playwright 产出的 `junit.xml` 整理成一份可读的 Markdown 报告（含执行概览、各 spec 明细、失败/跳过用例清单、产物路径）。需先执行测试生成 `junit.xml`，再运行报告生成：
+测试跑完后，把 Playwright 产出的 `junit.xml` 整理成可读 Markdown 报告（含执行概览、各 spec 明细、失败/跳过用例清单、产物路径），并由 AI 生成 `report-template.md` 风格的总结报告：
 
 ```powershell
-# 第 1 步：跑测试（生成 junit.xml）
-npm test -- --domain CONFIG-配置中心
+# 方式一（推荐）：一键执行 + 产出 digest，随后由 AI Agent 生成模板风格 AI 报告
+npm run test:report -- --domain CONFIG-配置中心 [--module BILLCFG-商业化计费配置]
+# 等价：node run-report.mjs --domain CONFIG-配置中心 [--module BILLCFG-商业化计费配置]
 
-# 第 2 步：生成报告
+# 方式二（分步）：先跑测试，再单独生成机械报告 + digest
+npm test -- --domain CONFIG-配置中心
 npm run report:gen -- --domain CONFIG-配置中心
-# 等价：node gen-report.mjs --domain CONFIG-配置中心
+
+# 可选：脚本内调 LLM 直接生成 AI 报告（需配置 AI_REPORT_BASE_URL/API_KEY）
+node gen-report.mjs --domain CONFIG-配置中心 --ai
 ```
 
 - 不传 `--module` → 读取全量结果 `test-reports/<一级模块>/all-modules/junit.xml`，报告落到同目录 `TEST-REPORT.md`。
 - 传 `--module` → 读取单个二级模块结果，报告落到 `test-reports/<一级模块>/<二级模块>/TEST-REPORT.md`。
 - 报告内容：元信息（环境 / 浏览器 / 版本 / 时间）、执行概览（通过/失败/跳过/错误/耗时）、各 spec 文件明细、失败用例清单、跳过用例清单、产物位置。
+- 同时产出 `execution-digest.json`（结构化执行结果，含每用例关联截图 / trace 路径），是 AI 生成模板报告的主数据源。
+
+**AI 总结报告（默认方式 B，无需密钥）**：`playwright-test-implementation` 技能在脚本就绪后会自动执行 `run-report.mjs` 并让 **AI Agent 读取 `execution-digest.json` + `report-template-regression.md` + 失败工件**，生成 `report-template.md` 风格的可读回归报告（失败根因归为 `ENV/DATA/SCRIPT/DEFECT/CHANGE`）。即「使用该技能 = 自动执行测试 + 自动产出 AI 报告」。
+
+- **方式 A（脚本调 LLM，CI 用）**：配置 `AI_REPORT_BASE_URL` + `AI_REPORT_API_KEY` 后加 `--ai`，脚本直接调用 LLM 生成；失败回退机械报告。
 
 > 报告生成脚本无额外依赖，仅用 Node 内置模块解析 `junit.xml`，可随时重跑。
 
@@ -200,7 +209,7 @@ npm run report:gen -- --domain CONFIG-配置中心
   - 单二级模块：`test-reports/<一级模块>/<二级模块>/html`
   - 一级模块全量：`test-reports/<一级模块>/all-modules/html`
 - **JUnit**：同目录下的 `junit.xml`（便于 CI 接入）。
-- **Markdown 报告**：执行测试后用 `npm run report:gen -- --domain <一级模块> [--module <二级模块>]` 生成，落到同目录 `TEST-REPORT.md`。详见「场景 J」。
+- **Markdown 报告**：执行测试后用 `npm run test:report -- --domain <一级模块> [--module <二级模块>]`（跑测试 + 产出 digest），再由 AI Agent 基于 `execution-digest.json` 生成模板风格 `TEST-REPORT.md`；纯机械报告可用 `npm run report:gen -- --domain <一级模块> [--module <二级模块>]`。详见「场景 J」。
 - **查看报告**：
 
 ```powershell
