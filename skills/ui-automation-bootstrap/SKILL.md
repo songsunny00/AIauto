@@ -26,13 +26,13 @@ allowed-tools: Read Glob Grep Edit Write
 1. 目标 UI 自动化目录结构
 2. 建议创建的 `specs/pages/fixtures/data` 文件清单
 3. `README.md` 需要说明的要点
-4. 每个 `FT-*` 对应的初始脚本命名建议
+4. 每个 `FT-*` 与**嵌入 FT/IT 表格的 `ET-*` 异常用例**对应的初始脚本命名建议（`ET-*` 写入同源功能 spec，不另立文件）
 5. 定位方式与等待策略建议
 6. 哪些场景先做、哪些场景后做
 
 ## 4. 使用步骤
 
-1. 从 `03` 中找出适合 UI 自动化的 `FT-*`。
+1. 从 `03` 中找出适合 UI 自动化的 `FT-*` 与**嵌入 FT/IT 表格中的 `ET-*` 异常用例**（`ET-*` 编号带功能域粒度 `ET-{MODULE}-{FEATURE}-{NNN}`，与所在 FT 表格域前缀一致；跨域异常 `ET-{MODULE}-X-{NNN}`）。
 2. 结合页面结构与原型说明，建议脚本拆分方式。
 3. 输出 `ATS-*.spec.ts` 命名建议。
 4. 输出页面对象、夹具、数据文件的最小清单。
@@ -75,6 +75,7 @@ Tests/
 │   │   │   │   ├── ATS-CONFIG-BILLCFG-LIST-001.spec.ts
 │   │   │   │   ├── ATS-CONFIG-BILLCFG-DETAIL-001.spec.ts
 │   │   │   │   └── ATS-CONFIG-BILLCFG-FORM-001.spec.ts
+│   │   │   │   # ET-* 异常用例（如 ET-BILLCFG-LIST-001）写入同域功能 spec 内，不另立 -ERR- 文件
 │   │   │   ├── pages/billing.page.ts
 │   │   │   ├── fixtures/billing.fixture.ts   # 消费 Tests/shared/.auth 登录态
 │   │   │   ├── data/billing.data.ts
@@ -122,7 +123,7 @@ Tests/
 
 | 文件                    | 说明                                 | 必需 |
 | ----------------------- | ------------------------------------ | ---- |
-| `specs/ATS-*.spec.ts`   | 每个功能点编号对应一个 spec 文件     | ✅   |
+| `specs/ATS-*.spec.ts`   | 每个功能点编号对应一个 spec 文件；嵌入 FT 表格的 `ET-*` 异常用例写入同域 spec 内，不另立文件 | ✅   |
 | `pages/*.page.ts`       | 页面对象，封装选择器与操作           | ✅   |
 | `fixtures/*.fixture.ts` | 模块夹具，封装模块级上下文与扩展能力 | ✅   |
 | `data/*.data.ts`        | 测试数据集中管理（基于系统已有数据） | ✅   |
@@ -151,7 +152,7 @@ Tests/
 - 输出 UI 自动化目录结构、文件清单、README 要点
 - 给出 `ATS-*.spec.ts` / `pages` / `fixtures` / `data` 的骨架建议
 - 给出场景优先级、定位方式、等待策略、可测性要求
-- 帮 tester 判断哪些 `FT-*` 适合先做、哪些场景应后做
+- 帮 tester 判断哪些 `FT-*` / `ET-*` 适合先做、哪些场景应后做（含嵌入 FT 表格的 `ET-*` 异常用例）
 
 ### 8.2 本 skill 不负责
 
@@ -172,7 +173,7 @@ Tests/
 ## 9. 约束
 
 - 不把 Browser Use 这类探索式能力当作正式回归脚本主引擎。
-- 脚本命名必须保留功能点编号主线。
+- 脚本命名必须保留功能点编号主线（`FT-*` / `ET-*` 均须保留）；`ET-*` 编号带功能域粒度 `ET-{MODULE}-{FEATURE}-{NNN}`，与同源 `FT-*` 落在同一 spec。
 - 优先用稳定定位点，再考虑脆弱选择器。
 - UI 自动化骨架可前置，但完整主场景脚本应在页面结构和定位点基本稳定后补齐。
 - **禁止在测试脚本中硬编码测试环境地址与账号**，必须通过 `Tests/ui-automation/.env` 这类环境配置注入。

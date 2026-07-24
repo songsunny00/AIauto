@@ -46,7 +46,10 @@ allowed-tools: Read Glob Grep Edit Write Bash
 
 ## 5. 实现步骤
 
-1. 从 `03` 中找出适合自动化的 `FT-*`，按功能域拆到 `ATS-*.spec.ts`。
+1. 从 `03` 中找出适合自动化的 `FT-*` 与**嵌入在 FT/IT 表格中的 `ET-*` 异常用例**，按功能域拆到对应 `ATS-*.spec.ts`：
+   - `FT-*` 与同功能域的 `ET-*`（如 `FT-BILLCFG-LIST-001` 与 `ET-BILLCFG-LIST-001`）写入**同一个** spec 文件（如 `ATS-CONFIG-BILLCFG-LIST-*.spec.ts`），`ET-*` 不另立 `-ERR-` 文件。
+   - `ET-*` 编号保留功能域粒度（`ET-{MODULE}-{FEATURE}-{NNN}`）用于追溯；跨域异常用 `ET-{MODULE}-X-{NNN}`，归入其主场景所在 spec。
+   - 每个用例标题/标签保留原始 `FT-*` / `ET-*` 编号，确保 `03` ↔ 脚本追溯链不断。
 2. 先补页面对象，再写测试步骤；选择器和交互细节收敛到 `pages/*.page.ts`。
 3. 测试数据统一收敛到 `data/*.data.ts`，避免在 spec 内散落字面量。
 4. 使用 `Tests/ui-automation/global-setup.ts` + `storageState` 复用登录态，避免每条用例重复登录。
@@ -170,7 +173,7 @@ await billingPage.expectToast("保存成功");
 ## 9. 版本迭代维护规则
 
 - 增量需求优先修改现有 `spec/page/data`，不要为同一页面平行再造一套脚本。
-- `FT-*` / `ATS-*` 编号主线必须保留，新增用例按同模块编号延展。
+- `FT-*` / `ET-*` / `ATS-*` 编号主线必须保留，新增用例按同模块、同功能域编号延展；嵌入 FT 表格的 `ET-*` 实现在同源 spec 内，不另立文件。
 - 如果前端 DOM 变化导致大量选择器失效，先统一修 page object，再回归 spec。
 - 如果需求文档口径变更，先同步测试数据与断言，再决定是否调整页面对象方法。
 - 只改与本次需求直接相关的脚本，不顺带整理无关文件。
@@ -231,6 +234,7 @@ await billingPage.expectToast("保存成功");
 - 是否先回归了最小影响范围，并保留失败工件。
 - 是否没有引入与当前需求无关的重构。
 - 是否把新增/变更的 `data-testid` 回写到了模块 `data-testid.snapshot.json`（而非仅分散在 page 对象）。
+- 是否将 `03` 中嵌入 FT/IT 表格的 `ET-*` 异常用例实现在同源功能 spec 内（不遗漏、不另立 `-ERR-` 文件）。
 
 ## 13. 执行与 AI 报告生成（技能默认必做收尾）
 
