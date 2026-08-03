@@ -1,3 +1,18 @@
-# 共享依赖根：由 Tests/package.json + package-lock.json 经 npm install / npm ci 还原，不入库
-# ui-automation / api-automation / shared 均上溯共用此处的 @playwright/test 与 tsx
+# 依赖
 node_modules/
+
+# 登录态（含 cookie/token，禁止提交）
+shared/.auth/
+
+# 测试报告产物
+ui-automation/test-reports/
+ui-automation/.last-run.json
+test-results/
+playwright-report/
+
+# 环境变量
+.env
+
+# IDE
+.vscode/
+.idea/

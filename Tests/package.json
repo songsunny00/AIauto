@@ -1,14 +1,23 @@
 {
-  "name": "ai-auto-tests",
-  "version": "1.0.0",
-  "private": true,
-  "description": "测试资产共享依赖根：Tests/ui、Tests/api-automation、Tests/shared 共用 @playwright/test 与 tsx 的单一可解析来源",
-  "scripts": {
-    "install:shared": "npm install"
-  },
-  "devDependencies": {
-    "@playwright/test": "^1.61.1",
-    "tsx": "^4.19.2",
-    "@types/node": "^26.1.1"
-  }
+    "name": "ai-auto-tests",
+    "version": "1.0.0",
+    "private": true,
+    "description": "AI自动化测试工程 — UI套件(@playwright/test) + 接口套件",
+    "scripts": {
+        "test": "node ui-automation/run.mjs",
+        "test:ui": "node ui-automation/run.mjs",
+        "test:list": "node ui-automation/run.mjs --list",
+        "test:install": "npx playwright install chromium",
+        "test:report": "node ui-automation/run-report.mjs",
+        "report:gen": "node ui-automation/gen-report.mjs",
+        "report": "npx playwright show-report",
+        "typecheck": "tsc --noEmit",
+        "auth:capture": "tsx shared/auth/capture-auth.ts"
+    },
+    "devDependencies": {
+        "@playwright/test": "1.62.0",
+        "@types/node": "^22.0.0",
+        "tsx": "^4.19.0",
+        "typescript": "^5.6.3"
+    }
 }

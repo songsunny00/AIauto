@@ -35,14 +35,15 @@ allowed-tools: Read Glob Grep Edit Write Bash
 5. 前置数据或权限是否真的不存在；`test.skip(reason)` 应基于**实际页面数据或明确前置条件检查**，不要仅凭脚本作者预设假设直接跳过。
 6. 若是写操作场景，是否已考虑**数据隔离、回收或清理**，避免污染后续用例。
 7. 当前改动是否只影响目标 `FT-*`，避免顺手重构无关脚本。
+8. 是否已安装 Playwright 浏览器二进制（`npx playwright install`）；首次执行 `auth:capture` 或跑测试前必须确认，漏装会导致浏览器启动报错（`Executable doesn't exist`）。
 
 ## 4. 工作模式
 
-| 场景 | 重点动作 | 期望输出 |
-| --- | --- | --- |
-| 新模块起步 | 从 `03` 拆 spec、补 page/fixture/data/config | 首轮可执行脚本 + 目录内说明 |
-| 版本迭代 | 对照需求增量修改既有 spec/page/data | 最小改动的脚本增量 |
-| 失败修复 | 先读失败工件，再定位脚本/数据/后端问题 | 可复现、可解释、可回归的修复 |
+| 场景       | 重点动作                                     | 期望输出                     |
+| ---------- | -------------------------------------------- | ---------------------------- |
+| 新模块起步 | 从 `03` 拆 spec、补 page/fixture/data/config | 首轮可执行脚本 + 目录内说明  |
+| 版本迭代   | 对照需求增量修改既有 spec/page/data          | 最小改动的脚本增量           |
+| 失败修复   | 先读失败工件，再定位脚本/数据/后端问题       | 可复现、可解释、可回归的修复 |
 
 ## 5. 实现步骤
 
@@ -50,6 +51,7 @@ allowed-tools: Read Glob Grep Edit Write Bash
    - `FT-*` 与同功能域的 `ET-*`（如 `FT-BILLCFG-LIST-001` 与 `ET-BILLCFG-LIST-001`）写入**同一个** spec 文件（如 `ATS-CONFIG-BILLCFG-LIST-*.spec.ts`），`ET-*` 不另立 `-ERR-` 文件。
    - `ET-*` 编号保留功能域粒度（`ET-{MODULE}-{FEATURE}-{NNN}`）用于追溯；跨域异常用 `ET-{MODULE}-X-{NNN}`，归入其主场景所在 spec。
    - 每个用例标题/标签保留原始 `FT-*` / `ET-*` 编号，确保 `03` ↔ 脚本追溯链不断。
+   - **spec 文件命名必须沿用 `ui-automation-bootstrap` 产出的 `ATS-{一级模块}-{二级模块}-{功能域}-{起始用例号}.spec.ts` 格式**（如 `ATS-CONFIG-BILLCFG-DETAIL-001.spec.ts`），禁止重命名为自由名称（如 `detail.spec.ts`）；若骨架未产出命名则按此格式补齐。
 2. 先补页面对象，再写测试步骤；选择器和交互细节收敛到 `pages/*.page.ts`。
 3. 测试数据统一收敛到 `data/*.data.ts`，避免在 spec 内散落字面量。
 4. 使用 `Tests/ui-automation/global-setup.ts` + `storageState` 复用登录态，避免每条用例重复登录。
@@ -217,6 +219,9 @@ await billingPage.expectToast("保存成功");
 - 禁止脱离页面实际数据凭空编写机构、项目、状态和合同数据。
 - 禁止让写操作残留数据无控制地污染后续用例。
 - 禁止为了修一个用例顺手重构整个自动化目录。
+- **禁止绕过 `run.mjs` / `run-report.mjs` 直接 `npx playwright test` 裸跑**：运行时作用域版 config 依赖 `TEST_DOMAIN_PATH`（必填），裸跑不注入该变量会直接报错。执行测试必须经 `node run.mjs --domain <一级模块> [--module <二级模块>]`、`node run-report.mjs --domain ...` 或对应 npm script（`npm test` / `npm run test:report`）。
+- **禁止为新增模块复制 `playwright.config.ts`**：config 只有一份（运行时作用域版，放 UI 套件根），新增模块零改 config；需要新模块时只新增 `<一级模块>/<二级模块>/specs/*.spec.ts` 目录。
+- **禁止把执行/报告链路三件套（`run.mjs` / `run-report.mjs` / `gen-report.mjs` / `report-template-regression.md`）下沉或复制到二级模块**：它们固定放 UI 套件根，所有模块共用。
 
 ## 12. 完成前自检
 
@@ -235,6 +240,9 @@ await billingPage.expectToast("保存成功");
 - 是否没有引入与当前需求无关的重构。
 - 是否把新增/变更的 `data-testid` 回写到了模块 `data-testid.snapshot.json`（而非仅分散在 page 对象）。
 - 是否将 `03` 中嵌入 FT/IT 表格的 `ET-*` 异常用例实现在同源功能 spec 内（不遗漏、不另立 `-ERR-` 文件）。
+- **执行测试是否经 `run.mjs` / `run-report.mjs`（或 `npm test` / `npm run test:report`）**，而非 `npx playwright test` 裸跑（裸跑不注入 `TEST_DOMAIN_PATH`，config 直接报错）。
+- **新增模块时是否零改 `playwright.config.ts`**（未复制 config 到二级模块、未在 config 里硬编码模块目录名）。
+- **报告是否落到正确粒度路径**：单二级模块 → `test-reports/<一级模块>/<二级模块>/`；一级模块全量 → `test-reports/<一级模块>/all-modules/`；`execution-digest.json` 与 `TEST-REPORT.md` 是否同在此目录。
 
 ## 13. 执行与 AI 报告生成（技能默认必做收尾）
 
@@ -251,6 +259,9 @@ npm run test:report -- --domain <一级模块> [--module <二级模块>]
 
 - `run-report.mjs` 内部依次执行 `run.mjs`（产出 `junit.xml` + 截图/trace 工件）与 `gen-report.mjs`（产出 `TEST-REPORT.md` 机械版 + `execution-digest.json`）。
 - 测试执行失败（退出码非 0）时不生成报告，需先按 §10 修复。
+- **首次执行前必须确认浏览器二进制已安装**：`npx playwright install`（装 chromium）或 `npx playwright install msedge`（装 Edge 通道）。漏装时 `auth:capture` / 测试执行会报 `Executable doesn't exist`。
+- **`--domain` 必填、禁止裸跑**：`run.mjs` / `run-report.mjs` 通过 `--domain <一级模块>` 注入 `TEST_DOMAIN_PATH`（必填），`--module <二级模块>` 可选注入 `TEST_MODULE_PATH`。**禁止 `npx playwright test` 裸跑**——运行时作用域版 config 读不到 `TEST_DOMAIN_PATH` 会直接报错（`TEST_DOMAIN_PATH 必填`）。`--domain` / `--module` 只接受单个目录段，禁止含 `/` `\` `..`。
+- **报告随运行粒度落盘**：`--module` 指定 → `test-reports/<一级模块>/<二级模块>/`；未指定 `--module`（一级模块全量）→ `test-reports/<一级模块>/all-modules/`。`junit.xml` / `html/` / `artifacts/` / `execution-digest.json` / `TEST-REPORT.md` 均在此目录。
 
 ### 13.2 结构化 digest（AI 报告主数据源）
 
