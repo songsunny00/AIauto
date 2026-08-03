@@ -1,0 +1,73 @@
+{
+  "$schema": "data-testid snapshot for 商业化计费配置 (CONFIG-配置中心/BILLCFG)",
+  "module": "配置中心 / 商业化计费配置",
+  "targetUrl": "http://localhost:7001/config/billingConfig",
+  "lastVerified": "2026-07-28",
+  "explorationSource": "Tests/playwright-cli-test/exploration/explore-testids-raw.json",
+  "designDoc": "Prds/V1.6.1/02-详细设计文档.md §7",
+  "regions": {
+    "listPage.queryArea": {
+      "elements": [
+        { "testid": "billing-search-inst-code", "selector": "[data-testid=billing-search-inst-code]", "tag": "DIV", "label": "机构名称(多选)", "evidence": "page-verified", "actual": { "exists": true, "visible": true } },
+        { "testid": "billing-search-project-code", "selector": "[data-testid=billing-search-project-code]", "tag": "DIV", "label": "检测项目(多选)", "evidence": "page-verified", "actual": { "exists": true, "visible": true } },
+        { "testid": "billing-search-product-no", "selector": "[data-testid=billing-search-product-no]", "tag": "DIV", "label": "产品套餐(多选)", "evidence": "page-verified", "actual": { "exists": true, "visible": true } },
+        { "testid": "billing-search-status", "selector": "[data-testid=billing-search-status]", "tag": "DIV", "label": "合同状态(单选)", "evidence": "page-verified", "actual": { "exists": true, "visible": true } },
+        { "testid": "billing-search-keyword", "selector": "[data-testid=billing-search-keyword]", "tag": "INPUT", "label": "合同编号", "evidence": "page-verified", "actual": { "exists": true, "visible": true } }
+      ]
+    },
+    "listPage.actions": {
+      "elements": [
+        { "testid": "billing-add-tenant-btn", "selector": "[data-testid=billing-add-tenant-btn]", "tag": "BUTTON", "label": "新增计费方案", "evidence": "page-verified", "actual": { "exists": true, "visible": true } },
+        { "testid": "billing-row-edit-btn-${index}", "selector": "[data-testid=billing-row-edit-btn-{i}]", "tag": "BUTTON", "label": "行编辑按钮", "evidence": "page-verified", "actual": { "exists": true, "instanceRange": "0~N" } },
+        { "testid": "billing-row-detail-btn-${index}", "selector": "[data-testid=billing-row-detail-btn-{i}]", "tag": "BUTTON", "label": "行明细按钮", "evidence": "page-verified", "actual": { "exists": true, "instanceRange": "0~N" } },
+        { "testid": "billing-row-toggle-btn-${index}", "selector": "[data-testid=billing-row-toggle-btn-{i}]", "tag": "BUTTON", "label": "行启停按钮(禁用/启用)", "evidence": "page-verified", "actual": { "exists": true, "instanceRange": "0~N" } }
+      ]
+    },
+    "editDialog": {
+      "elements": [
+        { "testid": "billing-org-name-select", "selector": "[data-testid=billing-org-name-select]", "tag": "DIV", "label": "机构名称(el-select)", "evidence": "page-verified", "actual": { "exists": true } },
+        { "testid": "billing-contract-no-input", "selector": "[data-testid=billing-contract-no-input]", "tag": "INPUT", "label": "合同编号", "evidence": "page-verified", "actual": { "exists": true } },
+        { "testid": "billing-storage-days-input", "selector": "[data-testid=billing-storage-days-input]", "tag": "INPUT", "label": "数据存储期限", "evidence": "page-verified", "actual": { "exists": true } },
+        { "testid": "billing-download-times-input", "selector": "[data-testid=billing-download-times-input]", "tag": "INPUT", "label": "文件下载次数(只读)", "evidence": "page-verified", "actual": { "exists": true } },
+        { "testid": "billing-total-quota-input", "selector": "[data-testid=billing-total-quota-input]", "tag": "INPUT", "label": "样本分析总次数(只读自动汇总)", "evidence": "page-verified", "actual": { "exists": true } },
+        { "testid": "billing-add-row-btn", "selector": "[data-testid=billing-add-row-btn]", "tag": "BUTTON", "label": "添加一行", "evidence": "page-verified", "actual": { "exists": true } },
+        { "testid": "billing-quota-input-${index}", "selector": "[data-testid=billing-quota-input-{i}]", "tag": "INPUT", "label": "配额行配额输入", "evidence": "page-verified", "actual": { "exists": true } },
+        { "testid": "billing-remove-row-btn-${index}", "selector": "[data-testid=billing-remove-row-btn-{i}]", "tag": "BUTTON", "label": "配额行删除按钮", "evidence": "page-verified", "actual": { "exists": true }, "note": "经验§5.1：命名 remove-row 而非 row-delete" },
+        { "testid": "billing-cancel-btn", "selector": "[data-testid=billing-cancel-btn]", "tag": "BUTTON", "label": "取消", "evidence": "page-verified", "actual": { "exists": true } },
+        { "testid": "billing-confirm-btn", "selector": "[data-testid=billing-confirm-btn]", "tag": "BUTTON", "label": "确定", "evidence": "page-verified", "actual": { "exists": true } }
+      ]
+    },
+    "detailDrawer": {
+      "elements": [
+        { "testid": "billing-detail-drawer", "selector": "[data-testid=billing-detail-drawer]", "tag": "DIV", "label": "明细抽屉根元素", "evidence": "page-verified", "actual": { "exists": true }, "note": "关闭态由父级.el-overlay display:none隐藏，可见性须用isVisible()判断(经验§6.1)" },
+        { "testid": "billing-detail-close-btn", "selector": "[data-testid=billing-detail-close-btn]", "tag": "BUTTON", "label": "抽屉关闭按钮", "evidence": "page-verified", "actual": { "exists": true } }
+      ]
+    },
+    "expandArea": {
+      "elements": [],
+      "note": "展开区未探测到任何data-testid(含详设定义的billing-expand-table也未找到)"
+    }
+  },
+  "fallbackLocators": {
+    "contractRangePicker": { "selector": ".el-dialog .el-date-editor:first-child", "reason": "合同周期日期范围选择器无testid，兜底定位弹窗内第一个.el-date-editor" },
+    "quotaRowCascader": { "selector": ".el-dialog .el-cascader:nth({i})", "reason": "配额行检测项目套餐级联组件无testid，按弹窗内顺序兜底" },
+    "expandIcon": { "selector": ".el-table__row .el-table__expand-icon", "reason": "展开图标无testid，用Element Plus固定class兜底" },
+    "usageTable": { "selector": "[data-testid=billing-detail-drawer] .el-table:first-child", "reason": "用量明细表无testid，取抽屉内第一个子表格" },
+    "historyTable": { "selector": "[data-testid=billing-detail-drawer] .el-table:nth-child(2)", "reason": "历史变更表无testid，取抽屉内第二个子表格" },
+    "editDialogFallback": { "selector": ".el-dialog", "reason": "billing-edit-dialog未命中，回退到.el-dialog" }
+  },
+  "gaps": {
+    "missingInPage": [
+      { "testid": "billing-edit-dialog", "designIntent": "编辑/新增弹窗根元素testid", "actual": { "exists": false }, "suggestedSelector": ".el-dialog", "impact": "低(有.el-dialog兜底)", "pageObjectStrategy": "dialog定位用[data-testid=billing-edit-dialog], .el-dialog回退" },
+      { "testid": "billing-expand-table", "designIntent": "展开区配额明细表testid", "actual": { "exists": false }, "suggestedSelector": ".el-table__expanded-row .el-table", "impact": "中(展开区操作依赖class兜底)", "pageObjectStrategy": "expandRow操作用.el-table__expand-icon+子表格class" },
+      { "testid": "billing-contract-range-picker", "designIntent": "合同周期日期范围选择器testid", "actual": { "exists": false }, "suggestedSelector": ".el-date-editor", "impact": "低", "pageObjectStrategy": "pickContractRange用弹窗内第一个.el-date-editor" },
+      { "testid": "billing-quota-cascader-${index}", "designIntent": "配额行检测项目套餐级联testid", "actual": { "exists": false }, "suggestedSelector": ".el-cascader", "impact": "中(多行时按nth定位有脆弱性)", "pageObjectStrategy": "cascaderAt按弹窗内nth索引兜底" }
+    ],
+    "extraInPage": []
+  },
+  "columnIndexNotes": {
+    "expandColumnOffset": 1,
+    "mapping": "idx0=序号, idx1=展开列(空), idx2=机构名称, idx3=检测项目, idx4=样本分析总次数, idx5=数据存储期限, idx6=单样本下载次数, idx7=合同编号, idx8=合同周期, idx9=合同状态, idx10=操作",
+    "source": "经验总结§5.2"
+  }
+}

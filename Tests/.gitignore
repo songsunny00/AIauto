@@ -7,7 +7,6 @@ shared/.auth/
 # 测试报告产物
 ui-automation/test-reports/
 ui-automation/.last-run.json
-test-results/
 playwright-report/
 
 # 环境变量

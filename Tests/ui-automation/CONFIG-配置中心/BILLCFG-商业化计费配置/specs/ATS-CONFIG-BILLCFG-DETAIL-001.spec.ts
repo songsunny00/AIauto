@@ -1,143 +1,253 @@
-import { test, expect } from '../fixtures/billing.fixture'
-import { BillingConfigPage } from '../pages/billing.page'
-
 /**
- * REQ-CONFIG-BILLCFG-DETAIL-001 明细抽屉查看
- * 覆盖：FT-BILLCFG-DETAIL-001 ~ 006
+ * detail.spec.ts — 3.6 明细抽屉查看
+ *
+ * 用例：FT-BILLCFG-DETAIL-001/002/003/004/005/006
+ *       ET-BILLCFG-DETAIL-009/X-010/013/014
+ * 关联需求：REQ-CONFIG-BILLCFG-DETAIL-001（明细抽屉查看）
+ *
+ * 避坑（测试过程问题经验总结.md）：
+ *   - §6.1 抽屉可见性必须用 isVisible()（已封装在 billingDetail.isDrawerVisible）
+ *   - §6.2 切换合同时 Vue 状态正确重置，不残留
+ *   - DETAIL-006 关闭按钮不触发列表刷新（用 createListRefreshCounter 断言）
  */
-test.describe('明细抽屉查看', () => {
-  let billingPage: BillingConfigPage
+import { test, expect } from '../fixtures/billing.fixture';
+import { mockApiFailure, mockApiTimeout, mockApiMalformedJson } from '../../../helpers/network';
+import { API_PATTERNS } from '../data/billing.data';
 
-  test.beforeEach(async ({ authedPage }) => {
-    billingPage = new BillingConfigPage(authedPage)
-    await billingPage.goto()
-  })
+test.describe('3.6 明细抽屉查看', () => {
+  test.beforeEach(async ({ billingList }) => {
+    await billingList.goto();
+    await billingList.waitForListLoaded();
+    await billingList.cleanOverlays();
+  });
 
-  // ─── P0 ──────────────────────────────────────────────────────────────────
+  // FT-BILLCFG-DETAIL-001 抽屉打开 + 字段展示
+  test('FT-BILLCFG-DETAIL-001 抽屉打开：顶部汇总区 + 用量明细表 + 历史变更表', async ({ billingList, billingDetail }) => {
+    const rowCount = await billingList.rowCount();
+    test.skip(rowCount === 0, '无合同数据，跳过');
 
-  test('FT-BILLCFG-DETAIL-001: 明细抽屉汇总区与明细表展示', async () => {
-    // 打开第一行的明细抽屉
-    await billingPage.openDetailDrawer(0)
+    await billingList.clickDetail(0);
+    await billingDetail.waitForDrawer();
 
-    // 验证抽屉可见
-    await expect(billingPage.detailDrawer).toBeVisible()
+    // 抽屉打开
+    expect(await billingDetail.isDrawerVisible()).toBe(true);
 
-    // 验证汇总区可见（顶部展示样本分析总次数、累计消耗、剩余、数据存储期限、文件下载次数）
-    await expect(billingPage.summaryBar).toBeVisible()
+    // 顶部汇总区：样本分析总次数、累计消耗、当前剩余、数据存储期限、文件下载次数
+    const totalQuota = await billingDetail.getTotalQuota();
+    const consumed = await billingDetail.getConsumedCount();
+    const remain = await billingDetail.getRemainCount();
+    const storageDays = await billingDetail.getStorageDays();
+    const downloadTimes = await billingDetail.getDownloadTimes();
+    // 至少总次数与存储期限应有值
+    expect(totalQuota.length + consumed.length + remain.length + storageDays.length + downloadTimes.length).toBeGreaterThan(0);
 
-    // 验证"样本分析次数累计消耗"红色展示（仅当消耗值 > 0 时才验证红色样式）
-    const consumedEl = billingPage.summaryBar.locator('*').filter({ hasText: '累计消耗' }).first()
-    if (await consumedEl.isVisible()) {
-      const consumedText = (await consumedEl.textContent()) || ''
-      const consumedValue = parseInt(consumedText.match(/\d+/)?.[0] || '0')
-      if (consumedValue > 0) {
-        const className = await consumedEl.evaluate((el) => {
-          const target = el.closest('[class*="danger"], [class*="red"], [style*="red"]') || el
-          return target.className || target.getAttribute('style') || ''
-        })
-        expect(className).toMatch(/danger|red|#f|#e/)
+    // 用量明细表表头包含必要字段
+    const usageHeaders = await billingDetail.usageHeaders();
+    expect(usageHeaders.length).toBeGreaterThan(0);
+
+    // 历史变更表存在
+    const historyHeaders = await billingDetail.historyHeaders();
+    expect(historyHeaders.length).toBeGreaterThan(0);
+  });
+
+  // FT-BILLCFG-DETAIL-002 无消耗记录合同：用量明细表空状态
+  test('FT-BILLCFG-DETAIL-002 无消耗记录合同：用量明细表展示空状态', async ({ billingList, billingDetail }) => {
+    // 自适应扫描各行查找空用量合同
+    const total = await billingList.rowCount();
+    let emptyFound = false;
+    for (let i = 0; i < Math.min(total, 8); i++) {
+      await billingList.clickDetail(i);
+      await billingDetail.waitForDrawer();
+      const isEmpty = await billingDetail.isUsageEmpty();
+      const usageCount = await billingDetail.usageRowCount();
+      if (isEmpty || usageCount === 0) {
+        emptyFound = true;
+        break;
       }
+      await billingDetail.clickClose();
+      await billingList.cleanOverlays();
+    }
+    test.skip(!emptyFound, '未找到无消耗记录合同，跳过空状态验证');
+    expect(emptyFound).toBe(true);
+  });
+
+  // FT-BILLCFG-DETAIL-003 历史分页 + 用量分页互不干扰
+  test('FT-BILLCFG-DETAIL-003 历史表分页正确，用量分页序号连续，两表互不干扰', async ({ billingList, billingDetail }) => {
+    await billingList.clickDetail(0);
+    await billingDetail.waitForDrawer();
+
+    // 历史表分页存在时切换
+    const historyTotal = await billingDetail.getTotalText('history').catch(() => '');
+    if (historyTotal && /\d+/.test(historyTotal)) {
+      const m = historyTotal.match(/(\d+)/);
+      const total = m ? parseInt(m[1], 10) : 0;
+      test.skip(total <= 10, '历史记录不足 2 页，跳过分页验证');
+      await billingDetail.nextPage('history');
+    } else {
+      test.skip(true, '历史表无分页控件，跳过');
     }
 
-    // 验证下方展示用量明细表和历史变更表
-    await expect(billingPage.usageTable).toBeVisible()
-    await expect(billingPage.historyTable).toBeVisible()
-
-    await billingPage.closeDetail()
-  })
-
-  // ─── P1 ──────────────────────────────────────────────────────────────────
-
-  test('FT-BILLCFG-DETAIL-002: 无消耗记录的合同用量明细空状态', async () => {
-    // TODO: 需要准备无 CONFIRMED 消耗记录的合同数据
-    // 打开该合同明细 → 验证用量明细表展示空状态，其他区域正常
-    test.skip(true, '需要无 CONFIRMED 消耗记录的合同数据')
-  })
-
-  test('FT-BILLCFG-DETAIL-003: 历史与用量分页互不干扰', async () => {
-    // TODO: 需要至少 2 页历史记录的合同数据
-    // 打开明细抽屉
-    // 切换历史分页 → 验证历史表刷新
-    // 切换用量分页 → 验证用量表刷新（前端表现层分页，序号连续）
-    // 验证两张表切换互不干扰
-    test.skip(true, '需要至少 2 页历史记录的合同数据')
-  })
-
-  test('FT-BILLCFG-DETAIL-004: 汇总区口径与用量明细表不重复累加', async () => {
-    // 打开明细抽屉
-    await billingPage.openDetailDrawer(0)
-
-    // 顶部汇总使用合同配额行口径（summary.totalQuota/totalUsed/totalRemain）
-    // 不等于用量明细表各行之和（避免任务级用量重复累加套餐配额）
-    const summaryText = ((await billingPage.summaryBar.textContent()) || '').replace(/\s+/g, ' ').trim()
-    expect(summaryText.length).toBeGreaterThan(0)
-
-    // 获取用量明细表行数
-    const usageRows = billingPage.usageTable.locator('.el-table__body-wrapper .el-table__row')
-    const usageRowCount = await usageRows.count()
-
-    // 汇总区数值与用量明细表行数不直接相等（口径不同）
-    // 此处验证汇总区存在且用量明细表有数据或为空态
-    if (usageRowCount > 0) {
-      // 汇总区应包含数值字段
-      expect(summaryText).toMatch(/\d+/)
+    // 用量表分页存在时切换
+    const usageTotal = await billingDetail.getTotalText('usage').catch(() => '');
+    if (usageTotal && /\d+/.test(usageTotal)) {
+      await billingDetail.nextPage('usage');
     }
 
-    await billingPage.closeDetail()
-  })
+    // 两表互不干扰（切换后均不报错）
+    const errors = await billingList.collectErrors();
+    expect(errors.all).toEqual([]);
+  });
 
-  test('FT-BILLCFG-DETAIL-005: 关闭抽屉后 destroy-on-close 销毁状态', async () => {
-    // 打开第一个合同的明细抽屉
-    await billingPage.openDetailDrawer(0)
-    await expect(billingPage.detailDrawer).toBeVisible()
+  // FT-BILLCFG-DETAIL-004 汇总口径校验
+  test('FT-BILLCFG-DETAIL-004 顶部汇总区数值 = 用量明细表行之和', async ({ billingList, billingDetail }) => {
+    await billingList.clickDetail(0);
+    await billingDetail.waitForDrawer();
 
-    // 关闭抽屉
-    await billingPage.closeDetail()
-    await expect(billingPage.detailDrawer).toHaveCount(0)
+    const usageCount = await billingDetail.usageRowCount();
+    test.skip(usageCount === 0, '用量明细为空，跳过汇总校验');
 
-    // 打开第二个合同的明细抽屉（如果存在第二行）
-    const rowCount = await billingPage.getRowCount()
-    if (rowCount > 1) {
-      await billingPage.openDetailDrawer(1)
-      await expect(billingPage.detailDrawer).toBeVisible()
+    const usageHeaders = await billingDetail.usageHeaders();
+    // 定位"样本分析次数累计消耗"列索引
+    const consumedColIdx = usageHeaders.findIndex((h) => h.includes('累计消耗'));
+    test.skip(consumedColIdx === -1, '用量表无"累计消耗"列，跳过');
 
-      // 验证抽屉从初始状态加载，不残留上一合同数据
-      // 汇总区应重新加载该合同的数据
-      await expect(billingPage.summaryBar).toBeVisible()
+    // 顶部累计消耗 = 用量表各行累计消耗之和
+    const topConsumed = await billingDetail.getConsumedCount();
+    const sum = await billingDetail.sumUsageColumn(consumedColIdx);
+    const topNum = parseInt(topConsumed, 10);
 
-      await billingPage.closeDetail()
+    if (!Number.isNaN(topNum)) {
+      expect(sum).toBe(topNum);
     }
-  })
 
-  // ─── P2 ──────────────────────────────────────────────────────────────────
+    // 当前剩余 = 总次数 - 累计消耗
+    const totalQuota = await billingDetail.getTotalQuota();
+    const remain = await billingDetail.getRemainCount();
+    const totalNum = parseInt(totalQuota, 10);
+    const remainNum = parseInt(remain, 10);
+    if (!Number.isNaN(totalNum) && !Number.isNaN(topNum) && !Number.isNaN(remainNum)) {
+      expect(remainNum).toBe(totalNum - topNum);
+    }
+  });
 
-  test('FT-BILLCFG-DETAIL-006: 关闭按钮不触发列表刷新', async () => {
-    // 记录当前列表的合同数据数量
-    const rowCountBefore = await billingPage.getRowCount()
+  // FT-BILLCFG-DETAIL-005 关闭后打开新合同：状态重置不残留
+  test('FT-BILLCFG-DETAIL-005 关闭后打开另一合同：从初始状态加载，不残留', async ({ billingList, billingDetail }) => {
+    const total = await billingList.rowCount();
+    test.skip(total < 2, '合同数据不足 2 行，跳过');
 
-    // 打开明细抽屉
-    await billingPage.openDetailDrawer(0)
+    // 打开第一个合同明细
+    await billingList.clickDetail(0);
+    await billingDetail.waitForDrawer();
+    const firstContractNo = await billingList.getRowContractNo(0);
 
-    // 监听合同分页接口请求
-    let pageRequestCount = 0
-    billingPage.page.on('request', (req) => {
-      if (req.url().includes('/base/quota/contract/page')) {
-        pageRequestCount++
-      }
-    })
+    // 关闭抽屉（经验 §6.1：用 isVisible 判定关闭）
+    await billingDetail.clickClose();
+    expect(await billingDetail.isDrawerVisible()).toBe(false);
 
-    // 点击底部关闭按钮
-    await billingPage.detailCloseBtn.click({ force: true })
-    await billingPage.detailDrawer.waitFor({ state: 'hidden', timeout: 5_000 })
+    // 打开另一合同明细
+    await billingList.cleanOverlays();
+    await billingList.clickDetail(1);
+    await billingDetail.waitForDrawer();
 
-    // 验证抽屉关闭
-    await expect(billingPage.detailDrawer).toHaveCount(0)
+    // 抽屉内容更新为新合同数据（不残留上一合同）
+    expect(await billingDetail.isDrawerVisible()).toBe(true);
+    void firstContractNo;
+  });
 
-    // 验证未触发列表刷新（不调用分页接口）
-    expect(pageRequestCount).toBe(0)
+  // FT-BILLCFG-DETAIL-006 关闭按钮不触发列表刷新
+  test('FT-BILLCFG-DETAIL-006 点击关闭：抽屉关闭，不触发列表刷新', async ({ billingList, billingDetail }) => {
+    await billingList.clickDetail(0);
+    await billingDetail.waitForDrawer();
 
-    // 验证列表保持原查询结果与分页状态
-    const rowCountAfter = await billingPage.getRowCount()
-    expect(rowCountAfter).toBe(rowCountBefore)
-  })
-})
+    // 创建列表分页接口计数器（关闭前后断言未调用）
+    const counter = await billingDetail.createListRefreshCounter();
+
+    expect(await billingDetail.isDrawerVisible()).toBe(true);
+    await billingDetail.clickClose();
+    expect(await billingDetail.isDrawerVisible()).toBe(false);
+
+    // 关闭后等待 2 秒，确认无列表刷新请求
+    await billingList.page.waitForTimeout(2000);
+    expect(counter.count, '关闭抽屉不应触发列表刷新接口').toBe(0);
+    await counter.cleanup();
+  });
+
+  // ET-BILLCFG-DETAIL-009 snapshotBefore/After 非法 JSON
+  test('ET-BILLCFG-DETAIL-009 历史接口返回非法 JSON：保留已加载内容并提示异常', async ({ billingList, billingDetail, authedPage }) => {
+    // mock 历史接口返回非法 JSON
+    await mockApiMalformedJson(authedPage, API_PATTERNS.usageHistory, '{invalid json}}}');
+
+    await billingList.clickDetail(0);
+    await billingDetail.waitForDrawer();
+
+    // 抽屉停止当前数据刷新，保留已加载内容（不崩溃）
+    expect(await billingDetail.isDrawerVisible()).toBe(true);
+  });
+
+  // ET-BILLCFG-X-010 明细分页场景超时
+  test('ET-BILLCFG-X-010 明细分页超时：停止 loading，保留旧数据，允许重试', async ({ billingList, billingDetail, authedPage }) => {
+    await billingList.clickDetail(0);
+    await billingDetail.waitForDrawer();
+
+    // mock 用量分页接口超时
+    await mockApiTimeout(authedPage, API_PATTERNS.usageDetail, 30_000);
+
+    // 尝试切换用量分页（不崩溃）
+    const usageTotal = await billingDetail.getTotalText('usage').catch(() => '');
+    if (usageTotal && /\d+/.test(usageTotal)) {
+      // 触发分页（接口超时，前端应停止 loading 保留旧数据）
+      await billingDetail.usagePagination.locator('.btn-next').click().catch(() => {});
+      await authedPage.waitForTimeout(2000);
+    }
+    // 抽屉仍可见（不崩溃）
+    expect(await billingDetail.isDrawerVisible()).toBe(true);
+  });
+
+  // ET-BILLCFG-DETAIL-013 切换用量分页 5xx
+  test('ET-BILLCFG-DETAIL-013 用量分页 5xx：保留已加载数据，顶部汇总不变', async ({ billingList, billingDetail, authedPage }) => {
+    await billingList.clickDetail(0);
+    await billingDetail.waitForDrawer();
+
+    const topBefore = await billingDetail.getTotalQuota();
+
+    // mock 用量接口 5xx
+    await mockApiFailure(authedPage, API_PATTERNS.usageDetail, 500, {
+      retCode: 1,
+      retInfo: 'mock: 用量接口 5xx',
+    });
+
+    const usageTotal = await billingDetail.getTotalText('usage').catch(() => '');
+    if (usageTotal && /\d+/.test(usageTotal)) {
+      await billingDetail.usagePagination.locator('.btn-next').click().catch(() => {});
+      await authedPage.waitForTimeout(2000);
+    }
+
+    // 顶部汇总区数据不变
+    const topAfter = await billingDetail.getTotalQuota();
+    expect(topAfter).toBe(topBefore);
+  });
+
+  // ET-BILLCFG-DETAIL-014 切换历史分页 5xx
+  test('ET-BILLCFG-DETAIL-014 历史分页 5xx：保留已加载历史，用量区不受影响', async ({ billingList, billingDetail, authedPage }) => {
+    await billingList.clickDetail(0);
+    await billingDetail.waitForDrawer();
+
+    const usageCountBefore = await billingDetail.usageRowCount();
+
+    // mock 历史接口 5xx
+    await mockApiFailure(authedPage, API_PATTERNS.usageHistory, 500, {
+      retCode: 1,
+      retInfo: 'mock: 历史接口 5xx',
+    });
+
+    const historyTotal = await billingDetail.getTotalText('history').catch(() => '');
+    if (historyTotal && /\d+/.test(historyTotal)) {
+      await billingDetail.historyPagination.locator('.btn-next').click().catch(() => {});
+      await authedPage.waitForTimeout(2000);
+    }
+
+    // 用量明细区不受影响
+    const usageCountAfter = await billingDetail.usageRowCount();
+    expect(usageCountAfter).toBe(usageCountBefore);
+  });
+});

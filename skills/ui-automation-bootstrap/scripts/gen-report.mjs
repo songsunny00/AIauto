@@ -41,7 +41,9 @@ function parseArgs(argv) {
 
 const args = parseArgs(process.argv.slice(2));
 if (!args.domain) {
-  console.error("[gen-report] 需要 --domain <一级模块>，例如 --domain CONFIG-配置中心");
+  console.error(
+    "[gen-report] 需要 --domain <一级模块>，例如 --domain CONFIG-配置中心",
+  );
   process.exit(2);
 }
 
@@ -109,11 +111,13 @@ async function callAI(digestText, templateText) {
     "规则：1) 不要编造用例或数据，所有数字来自 digest；2) 失败用例根因只归为 ENV/DATA/SCRIPT/DEFECT/CHANGE 之一；" +
     "3) 对失败用例给出预期vs实际、DOM状态、修复建议，并附 digest 中的截图/trace 相对路径；" +
     "4) 严格使用模板的章节结构，填满 {{占位}}，保留中文表头。";
-  const user =
-    `【报告模板】\n${templateText}\n\n【执行结果 digest】\n${digestText}\n\n请输出最终报告 Markdown（不要包裹代码块标记）。`;
+  const user = `【报告模板】\n${templateText}\n\n【执行结果 digest】\n${digestText}\n\n请输出最终报告 Markdown（不要包裹代码块标记）。`;
   const resp = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
     body: JSON.stringify({
       model,
       messages: [
@@ -148,9 +152,15 @@ while ((sm = suiteRe.exec(xml))) {
     let status = "passed";
     let message = "";
     const failM = cbody.match(/<failure\b[^>]*message="([^"]*)"/);
+    const errM = cbody.match(/<error\b[^>]*message="([^"]*)"/);
     if (/<failure\b/.test(cbody)) {
       status = "failed";
       message = failM ? failM[1] : "";
+    } else if (/<error\b/.test(cbody)) {
+      // 修复：识别 junit <error> 标签（用例因异常错误退出，非断言失败）。
+      // 原版漏识别导致 error 用例被误标为 passed（skill 固化版本修复此 bug）。
+      status = "error";
+      message = errM ? errM[1] : "";
     } else if (/<skipped\b/.test(cbody)) {
       status = "skipped";
       const skipM = cbody.match(/<property name="skip" value="([^"]*)"/);
@@ -189,7 +199,10 @@ function readEnv(key) {
     const i = t.indexOf("=");
     if (i <= 0) continue;
     if (t.slice(0, i).trim() === key) {
-      return t.slice(i + 1).trim().replace(/^['"]|['"]$/g, "");
+      return t
+        .slice(i + 1)
+        .trim()
+        .replace(/^['"]|['"]$/g, "");
     }
   }
   return "";
@@ -198,7 +211,9 @@ const envBase = readEnv("TEST_BASE_URL");
 const channel = readEnv("PW_BROWSER_CHANNEL") || "chromium(自带)";
 let pwVer = "";
 try {
-  const pj = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"));
+  const pj = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf8"),
+  );
   pwVer = pj.devDependencies?.["@playwright/test"] || "";
 } catch {
   // ignore
@@ -212,7 +227,9 @@ const totalPass = totalTests - totalFail - totalSkip - totalErr;
 const totalTime = +totals.time || 0;
 
 const now = new Date().toLocaleString("zh-CN");
-const reportName = args.module ? `${args.domain} / ${args.module}` : `${args.domain} (全量)`;
+const reportName = args.module
+  ? `${args.domain} / ${args.module}`
+  : `${args.domain} (全量)`;
 
 let md = `# UI 自动化测试报告\n\n`;
 md += `| 项 | 内容 |\n|---|---|\n`;
@@ -240,12 +257,15 @@ for (const s of suites) {
 }
 md += `\n`;
 
-const failedCases = suites
-  .flatMap((s) => s.cases.filter((c) => c.status === "failed").map((c) => ({ file: s.file, ...c })));
+const failedCases = suites.flatMap((s) =>
+  s.cases
+    .filter((c) => c.status === "failed" || c.status === "error")
+    .map((c) => ({ file: s.file, ...c })),
+);
 md += `## 三、失败用例清单\n\n`;
 if (failedCases.length) {
   for (const c of failedCases) {
-    md += `### ❌ ${c.file} — ${c.title}\n`;
+    md += `### ${c.status === "error" ? "⚠️" : "❌"} ${c.file} — ${c.title}\n`;
     if (c.message) md += `- 错误信息：${c.message}\n`;
     md += `- 分组：${c.group}\n\n`;
   }
@@ -253,8 +273,11 @@ if (failedCases.length) {
   md += `无失败用例 ✅\n\n`;
 }
 
-const skippedCases = suites
-  .flatMap((s) => s.cases.filter((c) => c.status === "skipped").map((c) => ({ file: s.file, ...c })));
+const skippedCases = suites.flatMap((s) =>
+  s.cases
+    .filter((c) => c.status === "skipped")
+    .map((c) => ({ file: s.file, ...c })),
+);
 if (skippedCases.length) {
   md += `## 四、跳过用例清单\n\n`;
   md += `| Spec 文件 | 用例 | 跳过原因 |\n|---|---|---|\n`;
@@ -267,7 +290,10 @@ if (skippedCases.length) {
 // ---- 结构化 digest（供 AI 生成报告 / Agent 读取） ----
 const artifactsDir = path.join(base, "artifacts");
 const artifactsAll = scanArtifacts(artifactsDir);
-const norm = (s) => String(s).toLowerCase().replace(/[\s_/\\:.-]/g, "");
+const norm = (s) =>
+  String(s)
+    .toLowerCase()
+    .replace(/[\s_/\\:.-]/g, "");
 function matchArtifacts(fileBase, title) {
   // Playwright 工件目录名形如 “…-<用例核心描述>-chromium”，而 digest 的 title 带
   // “PT-BILLCFG-001: ” 这类编号前缀。取冒号后的核心描述做关联，归一化时一并去掉 : . -
@@ -282,7 +308,11 @@ function matchArtifacts(fileBase, title) {
             norm(it.parent).includes(fN)),
       )
       .map((it) => path.relative(__dirname, it.file).split(path.sep).join("/"));
-  return { screenshots: pick("screenshots"), traces: pick("traces"), videos: pick("videos") };
+  return {
+    screenshots: pick("screenshots"),
+    traces: pick("traces"),
+    videos: pick("videos"),
+  };
 }
 const digest = {
   meta: {
@@ -293,7 +323,14 @@ const digest = {
     baseUrl: envBase || "(未配置)",
     browser: channel,
     playwright: pwVer,
-    totals: { tests: totalTests, pass: totalPass, fail: totalFail, skip: totalSkip, error: totalErr, time: totalTime },
+    totals: {
+      tests: totalTests,
+      pass: totalPass,
+      fail: totalFail,
+      skip: totalSkip,
+      error: totalErr,
+      time: totalTime,
+    },
   },
   suites: suites.map((s) => ({
     file: s.file,
@@ -303,12 +340,17 @@ const digest = {
     skip: s.skipped,
     error: s.errors,
     time: s.time,
-    cases: s.cases.map((c) => ({ ...c, artifacts: matchArtifacts(s.file, c.title) })),
+    cases: s.cases.map((c) => ({
+      ...c,
+      artifacts: matchArtifacts(s.file, c.title),
+    })),
   })),
 };
 const digestPath = path.join(base, "execution-digest.json");
 fs.writeFileSync(digestPath, JSON.stringify(digest, null, 2), "utf8");
-console.log(`[gen-report] 已生成结构化 digest: ${path.relative(__dirname, digestPath)}`);
+console.log(
+  `[gen-report] 已生成结构化 digest: ${path.relative(__dirname, digestPath)}`,
+);
 
 // ---- --ai：调用 LLM 生成模板风格报告（无密钥时回退机械报告） ----
 if (args.ai) {
@@ -318,7 +360,9 @@ if (args.ai) {
     const aiMd = await callAI(JSON.stringify(digest, null, 2), tpl);
     if (aiMd) {
       fs.writeFileSync(path.join(base, "TEST-REPORT.md"), aiMd, "utf8");
-      console.log(`[gen-report] AI 报告已生成: test-reports/${args.domain}/${args.module || "all-modules"}/TEST-REPORT.md`);
+      console.log(
+        `[gen-report] AI 报告已生成: test-reports/${args.domain}/${args.module || "all-modules"}/TEST-REPORT.md`,
+      );
       console.log(
         `[gen-report] 总用例 ${totalTests} | 通过 ${totalPass} | 失败 ${totalFail} | 跳过 ${totalSkip} | 错误 ${totalErr} | 耗时 ${totalTime.toFixed(2)}s`,
       );

@@ -3,3 +3,10 @@ MySpace/*
 .env
 .playwright-cli/*
 ./*/*/*/*/node_modules/*
+.claude/*
+.trae/*
+docs/*
+Tests/.auth/*
+Tests/playwright-cli-test/*
+Tests/.env
+Tests/test-reports/*

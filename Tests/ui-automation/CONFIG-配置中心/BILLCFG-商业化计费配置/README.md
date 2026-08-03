@@ -1,215 +1,150 @@
-# 商业化计费配置 - UI 自动化测试
+# BILLCFG-商业化计费配置 自动化测试
 
-## 测试概览
+> 配置中心 / 商业化计费配置 模块的 UI 自动化测试套件（基于 `@playwright/test`）。
+>
+> 覆盖 `Prds/V1.6.1/03-测试用例文档.md` 中的 48 条功能用例（LIST 18 + FORM 20 + DETAIL 10）。
 
-| 字段     | 值                                                                                   |
-| -------- | ------------------------------------------------------------------------------------ |
-| 测试版本 | V1.6.1-R1                                                                            |
-| 测试环境 | 通过 `Tests/ui/.env` 配置（见 `Tests/ui/.env.example`）                                |
-| 测试账号 | 通过 `Tests/ui/.env` 配置（admin 角色，菜单权限含 `menuId=11013`）                    |
-| 测试工具 | Playwright                                                                           |
-| 覆盖模块 | 配置中心 / 商业化计费配置                                                            |
-| 方案文档 | [billing-config-automation-plan.md](../../../docs/billing-config-automation-plan.md) |
+## 1. 目录结构
 
-## 目录结构
-
-```text
-Tests/ui/
-├─ package.json                                  # UI 自动化共享依赖入口 + npm scripts
-├─ run.mjs                                       # 跨平台执行脚本（一级模块必传、二级模块可选）
-├─ playwright.config.ts                          # UI 共享 Playwright 配置入口（动态 testDir/报告）
-├─ global-setup.ts                               # UI 共享登录态生成（一级模块级）
-├─ .env                                          # UI 共享环境与账号（不入库，见 .env.example）
-├─ .env.example                                  # UI 共享配置模板
-├─ .auth/                                        # UI 共享 storageState
-│  └─ <一级模块>/domain-state.json               # 一级模块共享登录态（如 CONFIG-配置中心/domain-state.json）
-├─ test-reports/                                 # UI 共享报告输出目录（不入库）
-│  └─ <一级模块>/
-│     ├─ all-modules/{html,junit.xml,artifacts}  # 一级模块全量运行报告
-│     └─ <二级模块>/{html,junit.xml,artifacts}   # 单二级模块运行报告
-└─ CONFIG-配置中心/
-   └─ BILLCFG-商业化计费配置/
-      ├─ specs/
-      │  ├─ ATS-CONFIG-BILLCFG-LIST-001.spec.ts  # 列表查询与默认加载 + 登录权限
-      │  ├─ ATS-CONFIG-BILLCFG-LIST-002.spec.ts  # 合同列表展示与展开明细
-      │  ├─ ATS-CONFIG-BILLCFG-LIST-003.spec.ts  # 合同状态展示与启停控制
-      │  ├─ ATS-CONFIG-BILLCFG-FORM-001.spec.ts  # 新增合同配置
-      │  ├─ ATS-CONFIG-BILLCFG-FORM-002.spec.ts  # 编辑合同配置
-      │  └─ ATS-CONFIG-BILLCFG-DETAIL-001.spec.ts# 明细抽屉查看
-      ├─ fixtures/
-      │  └─ billing.fixture.ts                   # 模块登录态 fixture（authedPage）
-      ├─ data/
-      │  └─ billing.data.ts                      # 测试数据集中管理
-      ├─ pages/
-      │  └─ billing.page.ts                      # 页面对象（26 个 data-testid 定位）
-      ├─ snapshots/                              # 页面结构快照（可选）
-      └─ README.md
+```
+BILLCFG-商业化计费配置/
+├── data/
+│   ├── billing.data.ts        # 测试数据（默认值、合同编号生成、API 模式、EXISTING_DATA 待回填）
+│   ├── billing-texts.ts       # 文案常量（状态文案、校验提示、toast、按钮文案，精确匹配）
+│   └── billing-mock.ts        # ET 用例 mock 响应体
+├── fixtures/
+│   └── billing.fixture.ts     # 模块夹具：组合 3 个 Page Object + 写操作数据清理上下文
+├── pages/
+│   ├── billing-list.page.ts   # 列表页面对象（查询区、主表、分页、行操作、展开区）
+│   ├── billing-form.page.ts   # 新增/编辑弹窗页面对象（基础信息、配额行、提交）
+│   └── billing-detail.page.ts # 明细抽屉页面对象（汇总区、用量表、历史表、分页）
+├── specs/
+│   ├── ATS-CONFIG-BILLCFG-LIST-001.spec.ts   # 3.1 列表查询与默认加载（12 条）
+│   ├── ATS-CONFIG-BILLCFG-LIST-005.spec.ts   # 3.2 列表展示与展开明细（3 条）
+│   ├── ATS-CONFIG-BILLCFG-LIST-008.spec.ts   # 3.3 状态展示与启停控制（3 条）
+│   ├── ATS-CONFIG-BILLCFG-FORM-001.spec.ts   # 3.4 新增合同配置（15 条）
+│   ├── ATS-CONFIG-BILLCFG-FORM-006.spec.ts   # 3.5 编辑合同配置（5 条）
+│   └── ATS-CONFIG-BILLCFG-DETAIL-001.spec.ts # 3.6 明细抽屉查看（10 条）
+└── snapshots/
+    └── data-testid.snapshot.json  # 页面 data-testid 快照（设计意图 vs 页面实际 + 兜底定位）
 ```
 
-## 用例覆盖清单
+## 2. 运行方式
 
-| 文件                                    | 覆盖用例                                                  | 优先级   |
-| --------------------------------------- | --------------------------------------------------------- | -------- |
-| `ATS-CONFIG-BILLCFG-LIST-001.spec.ts`   | `PT-BILLCFG-001~003`；`FT-BILLCFG-LIST-001~004, 011, 016` | P0/P1    |
-| `ATS-CONFIG-BILLCFG-LIST-002.spec.ts`   | `FT-BILLCFG-LIST-005~007, 012, 015`                       | P0/P1    |
-| `ATS-CONFIG-BILLCFG-LIST-003.spec.ts`   | `FT-BILLCFG-LIST-008~010, 013, 014`                       | P0/P1    |
-| `ATS-CONFIG-BILLCFG-FORM-001.spec.ts`   | `FT-BILLCFG-FORM-001~005, 009~014, 018`                   | P0/P1    |
-| `ATS-CONFIG-BILLCFG-FORM-002.spec.ts`   | `FT-BILLCFG-FORM-006~008, 015, 016`                       | P0/P1    |
-| `ATS-CONFIG-BILLCFG-DETAIL-001.spec.ts` | `FT-BILLCFG-DETAIL-001~006`                               | P0/P1/P2 |
+### 2.1 前置准备
 
-**总用例数：39 个 FT + 3 个 PT（其余 PT/ET 需接口或手工补充）**
+1. 安装依赖（在 `Tests/` 目录）：
 
-## 编号主线
+   ```powershell
+   npm install
+   ```
 
-```text
-REQ-CONFIG-BILLCFG-{LIST/FORM/DETAIL}-{NNN}
- ├─ FT-BILLCFG-{NNN}  → ATS-CONFIG-BILLCFG-{NNN}.spec.ts
- ├─ IT-BILLCFG-{NNN}  → ATS-CONFIG-BILLCFG-{NNN}.api.spec.ts（接口侧，另行实施）
- └─ PT-BILLCFG-{NNN}  → 合并至对应 REQ 的 spec
-```
+2. 安装 Playwright 浏览器二进制（首次或换机必做，漏装会导致 `auth:capture` / 测试执行报 `Executable doesn't exist`）：
 
-## data-testid 覆盖
+   ```powershell
+   npx playwright install
+   # 或指定 Edge 通道：npx playwright install msedge
+   ```
 
-本模块 Page Object（`pages/billing.page.ts`）封装了 26 个 `data-testid` 稳定定位，命名规范 `billing-{区域}-{元素}-{序号}`：
+3. 捕获登录态（首次或 token 过期时，需手动过滑块验证码）：
 
-| 区域          | 命名前缀                                                               | 数量 | 示例                        |
-| ------------- | ---------------------------------------------------------------------- | ---- | --------------------------- |
-| 查询区        | `billing-search-*`                                                     | 5    | `billing-search-inst-code`  |
-| 主列表操作    | `billing-add-tenant-btn`、`billing-row-*-btn-{i}`                      | 4    | `billing-row-edit-btn-0`    |
-| 展开明细      | `billing-expand-table`                                                 | 1    | `billing-expand-table`      |
-| 新增/编辑弹窗 | `billing-edit-dialog`、`billing-*-input/select`、`billing-quota-*-{i}` | 14   | `billing-contract-no-input` |
-| 明细抽屉      | `billing-detail-drawer`、`billing-detail-close-btn`                    | 2    | `billing-detail-drawer`     |
+   ```powershell
+   npm run auth:capture
+   ```
 
-## 前置条件
+   > 该命令会打开可见 Edge 浏览器，预填账号 `admin_shl`，用户手动完成登录与验证码后关闭浏览器，
+   > storageState 保存到 `Tests/shared/.auth/CONFIG-配置中心/state.json`。
 
-确认以下测试数据已在环境中初始化（对应 `03-测试用例文档.md` §2.3）：
+4. 确认 `Tests/.env` 包含：
 
-1. 至少 2 个启用机构，用于查询筛选与新增弹窗机构下拉。
-2. 至少 2 个检测项目；每个项目至少 1 个产品套餐。
-3. 合同状态数据：`NORMAL`、`EXPIRING_SOON`、`EXPIRED`、`DISABLED` 各 1 条。
-4. 编辑态数据：`hasConsumed=false` 合同 1 条；`hasConsumed=true` 合同 1 条。
-5. 用量与历史数据：有 `CONFIRMED` 消耗记录的合同、有 `EDIT` 历史的合同。
-6. 边界校验数据：同机构下已存在的 `contractNo`、某配额行 `usedCount > 0` 的合同。
+   ```env
+   TEST_BASE_URL=http://localhost:7001
+   TEST_USERNAME=admin_shl
+   TEST_PASSWORD=admin_shl@123
+   ```
 
-## 运行方式
-
-### 安装依赖（首次）
+### 2.2 执行测试
 
 ```powershell
-cd d:\AIauto\Tests\ui
-npm install
-# 使用系统 Edge/Chrome 时无需下载；如需 Playwright 自带 chromium：
-npm run test:install
+# 在 Tests/ 目录执行全部 UI 用例
+npm run test:ui
+
+# 仅执行计费配置模块（指定路径）
+npx playwright test --config=ui-automation/playwright.config.ts --grep "BILLCFG"
+
+# 生成 HTML + JUnit 报告
+npm run test:report
 ```
 
-### 配置环境与账号
+报告输出至 `Tests/ui-automation/test-reports/`。
 
-复制 `Tests/ui/.env.example` 为 `Tests/ui/.env`，填入实际值：
+## 3. 数据回填说明（⚠️ 重要）
 
-```powershell
-cd d:\AIauto\Tests\ui
-Copy-Item .env.example .env
-# 编辑 .env 填入 TEST_BASE_URL、TEST_USERNAME、TEST_PASSWORD、PW_BROWSER_CHANNEL
+`data/billing.data.ts` 中的 `EXISTING_DATA` 标注了「⚠️ 待回填」字段。本套件采用**数据自适应策略**减少硬编码依赖：
+
+| 用例类型                                | 自适应策略                                                           | 仍需回填的场景 |
+| --------------------------------------- | -------------------------------------------------------------------- | -------------- |
+| 状态相关（LIST-008/013/014、启停）      | `findRowByStatus` / `findRowByToggleText` 扫描当前页定位             | 无             |
+| 可编辑/只读（FORM-006/007/008/015/016） | `findEditableRow` / `findReadonlyRow` 打开编辑弹窗按确定按钮状态判定 | 无             |
+| 重复合同编号（FORM-016）                | 读取其他行合同编号作为重复值                                         | 无             |
+| 空状态（LIST-007、DETAIL-002）          | 扫描各行展开区/明细查找空数据                                        | 无             |
+
+> 自适应定位失败时用例自动 `test.skip` 并标注原因，不会误报失败。
+
+## 4. 架构设计
+
+### 4.1 Page Object Model
+
+- **BillingListPage**：封装列表查询区、主表读取、分页、行操作、展开区，含数据自适应行查找。
+- **BillingFormPage**：封装新增/编辑弹窗的基础信息字段、配额行操作、提交/取消、只读态判定。
+- **BillingDetailPage**：封装明细抽屉的汇总区读取、用量/历史表、分页、关闭操作。
+
+### 4.2 Fixture 层级
+
+```
+base.fixture (authedPage: 已登录 Page)
+  └─ billing.fixture (billingList + billingForm + billingDetail + billingContext)
 ```
 
-`Tests/ui/.env` 已在 `Tests/ui/.gitignore` 中忽略，不会入库。
+- `authedPage`：消费 storageState 创建已登录上下文（viewport 1440×900，zh-CN）。
+- `billingContext.createdContractNos`：记录新增的合同编号，供测试后清理。
 
-> 说明：`PW_BROWSER_CHANNEL` 留空使用 Playwright 自带 chromium；设 `msedge` 使用系统 Edge（无需额外下载浏览器）。
+### 4.3 复用层（helpers/）
 
-### 执行边界
+| 文件              | 作用                                                       | 沉淀的经验                                              |
+| ----------------- | ---------------------------------------------------------- | ------------------------------------------------------- |
+| `element-plus.ts` | el-select/el-cascader/el-date-range-picker/MessageBox 交互 | §1.2 placeholder 拦截、§1.3 日历定位、§2.1 级联残留菜单 |
+| `errors.ts`       | 错误消息收集（toast + 行内双查）                           | §1.1 配额行校验错误出现在 toast                         |
+| `network.ts`      | API 等待/mock/调用计数                                     | ET 用例接口 mock、断言未调用接口                        |
+| `visibility.ts`   | 可见性判断/残留清理/列偏移修正                             | §6.1 isVisible、§4.4 残留遮罩、§5.2 展开列偏移          |
 
-- 一次执行只面向**一个一级模块**（`TEST_DOMAIN_PATH` 必传）。
-- 在锁定一级模块后，可跑该一级模块下**全部二级模块**，或只跑**某个二级模块**（`TEST_MODULE_PATH` 可选）。
+## 5. 自检清单
 
-### 执行测试（推荐：跨平台脚本）
+- [x] 登录态：persistent profile / storageState 管理，不每用例重登
+- [x] 表单字段完整性：probe-form-fields.js 探测无 testid 必填字段
+- [x] 网络监控：waitForApi / createCallCounter 验证接口调用
+- [x] 截图绝对路径：playwright.config screenshot only-on-failure
+- [x] 临时脚本清理：固化脚本在 persistent-profile/，本套件无临时脚本残留
+- [x] 错误双查：collectErrors 同时检查 toast 和行内错误
+- [x] 抽屉可见性：用 isVisible()，禁止 getComputedStyle
+- [x] 列偏移修正：getCellText 自动加展开列偏移
 
-`run.mjs` 会屏蔽 Windows / Bash 设置中文环境变量的差异：
+## 6. 用例覆盖矩阵
 
-```powershell
-cd d:\AIauto\Tests\ui
+| spec 文件                             | 用例数 | 覆盖用例                                                                   |
+| ------------------------------------- | ------ | -------------------------------------------------------------------------- |
+| ATS-CONFIG-BILLCFG-LIST-001.spec.ts   | 12     | LIST-001/002/003/004/011/012/013/014/015/016 + ET-LIST-001/011             |
+| ATS-CONFIG-BILLCFG-LIST-005.spec.ts   | 3      | LIST-005/006/007                                                           |
+| ATS-CONFIG-BILLCFG-LIST-008.spec.ts   | 3      | LIST-008/009/010                                                           |
+| ATS-CONFIG-BILLCFG-FORM-001.spec.ts   | 15     | FORM-001/002/003/004/005/009/010/011/012/013/014/018 + ET-FORM-003/004/012 |
+| ATS-CONFIG-BILLCFG-FORM-006.spec.ts   | 5      | FORM-006/007/008/015/016                                                   |
+| ATS-CONFIG-BILLCFG-DETAIL-001.spec.ts | 10     | DETAIL-001/002/003/004/005/006 + ET-DETAIL-009/X-010/013/014               |
+| **合计**                              | **48** |                                                                            |
 
-# 跑一级模块下全部二级模块
-node run.mjs --domain CONFIG-配置中心
+## 7. 已知限制
 
-# 只跑某个二级模块
-node run.mjs --domain CONFIG-配置中心 --module BILLCFG-商业化计费配置
-
-# 只跑单个 spec 文件（-- 之后为透传给 playwright 的参数）
-node run.mjs --domain CONFIG-配置中心 --module BILLCFG-商业化计费配置 -- specs/ATS-CONFIG-BILLCFG-LIST-001.spec.ts
-
-# 仅列出用例（discovery）
-node run.mjs --domain CONFIG-配置中心 --list
-node run.mjs --domain CONFIG-配置中心 --module BILLCFG-商业化计费配置 --list
-```
-
-### 执行测试（原生 playwright 命令）
-
-**PowerShell：**
-
-```powershell
-$env:TEST_DOMAIN_PATH = 'CONFIG-配置中心'
-$env:TEST_MODULE_PATH = 'BILLCFG-商业化计费配置'
-npx playwright test --config=playwright.config.ts
-```
-
-**Bash / Git Bash：**
-
-```bash
-TEST_DOMAIN_PATH=CONFIG-配置中心 TEST_MODULE_PATH=BILLCFG-商业化计费配置 npx playwright test --config=playwright.config.ts
-```
-
-### 查看报告
-
-```powershell
-# 单二级模块运行报告
-npx playwright show-report d:\AIauto\Tests\ui\test-reports\CONFIG-配置中心\BILLCFG-商业化计费配置\html
-
-# 一级模块全量运行报告
-npx playwright show-report d:\AIauto\Tests\ui\test-reports\CONFIG-配置中心\all-modules\html
-```
-
-## 定位与等待策略
-
-| 优先级 | 方式                  | 示例                                         |
-| ------ | --------------------- | -------------------------------------------- |
-| 1      | `getByTestId`（首选） | `page.getByTestId('billing-search-status')`  |
-| 2      | `getByRole + name`    | `page.getByRole('button', { name: '查询' })` |
-| 3      | 稳定属性              | `.el-tag--success`、`.el-table__row`         |
-| 4      | 脆弱 CSS（最后）      | 仅用于无 `data-testid` 的辅助元素            |
-
-关键等待策略：
-
-- 弹窗打开：`editDialog` 可见 + `.el-loading-mask` 计数为 0
-- 级联选择：`el-cascader-menu:visible` 可见后点选项
-- 提示消息：`.el-message:visible` 含文案
-- 网络等待：`waitForLoadState('networkidle')`
-
-## 已知限制与 TODO
-
-| 项                 | 说明                                                   | 关联用例       |
-| ------------------ | ------------------------------------------------------ | -------------- |
-| `Promise.all` 耦合 | `onMounted` 任一选项接口失败导致主表不加载             | `ET-011`       |
-| 汇总计算口径冲突   | 详设按 `lines[]` 聚合 vs 需求按用量明细求和，未解决    | `DETAIL-004`   |
-| 只读态数据缺失     | 需准备 `hasConsumed=true` 合同                         | `FORM-007/015` |
-| 术语变更未同步     | `合同编号`→`合同编码` 在 `01-需求文档.md` 中未全量统一 | 全模块         |
-
-## 报告字段（执行后回填）
-
-| 字段     | 值                           |
-| -------- | ---------------------------- |
-| 报告版本 | V1.6.1-R1                    |
-| 测试环境 | 见 `Tests/ui/.env` 中 `TEST_BASE_URL` |
-| 用例总数 | 42（39 FT + 3 PT）           |
-| 通过数   | {}                           |
-| 失败数   | {}                           |
-| 阻塞数   | {}                           |
-| 风险结论 | {}                           |
-
-## 注意事项
-
-1. 测试前需确认 `Tests/ui/.env` 中 `TEST_BASE_URL` 指向的目标环境可访问。
-2. 多选查询字段（`instCode`、`projectCode`、`productNo`）以逗号分隔字符串传递；`displayStatus` 为下拉单选，直接传递单值。
-3. 元素选择器基于 Element Plus 组件库，若 UI 框架定制需调整 `pages/billing.page.ts`。
-4. `FORM-007/015/DETAIL-002/003` 等用例依赖特定数据，缺失时以 `test.skip` 跳过。
-5. 网络较慢时可适当调整 `Tests/ui/playwright.config.ts` 中的 `timeout` 值。
-6. 结果回填至 `Prds/V1.6.1/04-测试执行记录.md` 与模块级 `TRACE.yaml`。
+1. **新增数据清理**：当前无删除合同接口（`terminate` 未纳入前端），新增合同仅记录到 `billingContext`。
+   建议测试后用 `cleanup-disable.js`（persistent-profile）禁用本次新增合同，或人工清理。
+2. **展开区无 testid**：展开明细区依赖 `.el-table__expand-icon` 与子表格 class 兜底，若前端 DOM 结构变更需同步更新。
+3. **明细抽屉汇总区读取**：顶部汇总区字段无 testid，按标签文案定位相邻数值，依赖标签文案稳定性。
+4. **级联组件多行定位**：配额行级联无 testid，按弹窗内 nth 索引兜底，行数较多时存在脆弱性。
