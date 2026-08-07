@@ -73,7 +73,7 @@ description: 用于使用 playwright-cli 对 Element Plus 页面执行 UI 功能
 ```powershell
 # ✅ 正确：目标地址直接取自测试用例文档 §2.1 完整前端入口
 $targetUrl = "http://localhost:7001/config/billingConfig"  # 从 03-测试用例文档.md §2.1 读取
-playwright-cli open --profile="$PROFILE_DIR" --browser=msedge $targetUrl
+playwright-cli open --profile="$PROFILE_DIR" --browser=chromium $targetUrl
 
 # ❌ 禁止：硬编码地址（含从历史会话/记忆取）
 playwright-cli open http://ack.omicsone.com/config/billingConfig
@@ -85,11 +85,52 @@ $targetUrl = "$baseUrl/config/billingConfig"
 
 ---
 
+## 2.5 安装前置要求（首次使用必读）
+
+> 本 skill 依赖以下组件。**执行测试前必须确认已安装，缺失则先安装再继续**，禁止在缺依赖情况下直接跑 `open` / `run-code`。
+
+### 2.5.1 依赖清单
+
+| 依赖 | 用途 | 版本要求 | 检查命令 |
+|---|---|---|---|
+| Node.js + npm | 运行 playwright-cli（npm 全局包） | Node ≥ 18 LTS | `node -v` / `npm -v` |
+| @playwright/cli（playwright-cli） | 浏览器自动化驱动 | 最新稳定版 | `playwright-cli --version` |
+| Playwright 完整 chromium（GUI 版） | 支撑 `--profile`（persistent）与 `--headed` 登录；`chromium_headless_shell` 不足以持久化 | 随 playwright-cli 安装 | 见 §2.5.2 |
+
+> **关键说明**：`--profile`（persistent / `launchPersistentContext`）需要**完整 GUI chromium**，`chromium_headless_shell` 无法承载持久化上下文。必须用 `playwright install chromium` 安装完整版（不是仅 headless shell）。本机 `ms-playwright/chromium-*` 目录存在即表示已装。
+
+### 2.5.2 安装步骤（缺失时按序执行）
+
+```powershell
+# 1. 安装 playwright-cli（全局）
+npm install -g @playwright/cli@latest
+
+# 2. 安装 Playwright 官方 skills（消除版本警告）
+playwright-cli install --skills=agents
+
+# 3. 安装完整 chromium（GUI 版，支撑 --profile 与 --headed）
+playwright-cli install chromium
+```
+
+> 安装后确认：`playwright-cli --version` 正常输出版本；`$env:USERPROFILE\AppData\Local\ms-playwright\chromium-*\chrome-win\chrome.exe` 存在。
+
+### 2.5.3 缺失引导（面向用户）
+
+若检测到依赖缺失，主动提示用户并等待安装完成，**不要静默继续**：
+
+> ⚠️ 检测到 `[xxx]` 未安装。请先执行以下命令安装后再继续测试：
+> 1. `npm install -g @playwright/cli@latest`
+> 2. `playwright-cli install chromium`
+> 安装完成后回复"已安装"，我再继续。
+
+---
+
 ## 3. 前置检查（指令）
 
 1. `playwright-cli --version` 正常输出 → **跳过 install**；仅命令缺失或版本过旧才 `npm install -g @playwright/cli@latest`。
 2. 输出含版本警告框（skill 与 tool 不匹配）→ 执行 `playwright-cli install --skills=agents`（exit code 可能非 0 但实际成功）；输出干净则跳过。
 3. 按 §2.1 解析路径变量；确认 `PROFILE_DIR` 目录存在（首启自动创建，首次需手动登录一次），长期复用。
+4. 确认 Playwright 完整 chromium 已安装（见 §2.5）；缺失则先 `playwright-cli install chromium` 再继续。
 4. 确认 `${ENV_FILE}`（`Tests/.env`）含 `TEST_BASE_URL`、`TEST_USERNAME`、`TEST_PASSWORD`；目标地址按 §2.2 直接取自测试用例文档 §2.1 完整前端入口（不拼接，不明确则询问用户）。
 5. 确认 `03-测试用例文档.md`（FT-\* 来源）与模块 `data-testid.snapshot.json`、`02-详细设计文档.md` §7 是否就绪。
 
@@ -105,7 +146,7 @@ $targetUrl = "$baseUrl/config/billingConfig"
 
 ```powershell
 # 启动（首次需手动登录，后续自动复用登录态）
-playwright-cli open --profile="$PROFILE_DIR" --browser=msedge "$targetUrl"
+playwright-cli open --profile="$PROFILE_DIR" --browser=chromium "$targetUrl"
 
 # 验证登录态（ensureLoginState 语义）
 playwright-cli eval "() => ({ url: location.href, loggedIn: !location.href.includes('login') })"
@@ -118,60 +159,55 @@ playwright-cli eval "() => ({ url: location.href, loggedIn: !location.href.inclu
   ├─ 否 → 登录态有效，继续执行
   └─ 是 → 登录态失效
         → 关闭 playwright-cli 会话（释放 profile 锁）
-        → 启动可见浏览器复用 persistent profile（见 §4.1.1）
+        → 启动可见浏览器（--headed 模式，见 §4.1.1）
         → 提示用户手动登录（含验证码），完成后关闭可见浏览器并回复继续
         → 等待用户确认
         → 重新用 playwright-cli 打开页面并验证登录态
         → 仍失效则终止并报告
 ```
 
-### 4.1.1 登录态失效时打开可见浏览器（帮用户完成手动登录）
+### 4.1.1 登录态失效时打开可见浏览器（--headed 模式，帮用户完成手动登录）
 
-> **本节解决"看不到 playwright-cli 浏览器窗口"问题**：playwright-cli 打开的浏览器窗口用户可能无法看到或无法操作（headless/隐藏/被遮挡），导致无法完成手动登录（尤其涉及滑块验证码、短信验证码时）。**登录态失效时主动为用户打开一个可见浏览器窗口**，而非仅提示"在已打开的浏览器中登录"。
+> **本节解决"看不到 playwright-cli 浏览器窗口、无法手动登录"问题**：登录态失效时，主动用 `playwright-cli open --headed` 打开一个**可见的 chromium 窗口**（复用同一 persistent profile），让用户在其中完成账号/验证码登录，而非仅提示"在已打开的浏览器中登录"或依赖外部 msedge。
 
 **触发条件**：`ensureLoginState()` 检测到 URL 含 `/login`（登录态失效）。
 
 **操作流程**：
 
-1. **关闭 playwright-cli 当前会话**（释放 persistent profile 锁，避免与手动浏览器冲突）：
+1. **关闭 playwright-cli 当前（无头）会话**（释放 persistent profile 锁，避免与可见浏览器冲突）：
 
    ```powershell
    playwright-cli close 2>$null
    ```
 
-2. **启动可见 Edge 浏览器，复用同一 persistent profile**（用户可手动操作）：
+2. **用 `--headed` 打开可见 chromium，复用同一 persistent profile**（用户可手动操作）：
 
    ```powershell
-   # 定位 msedge.exe（兼容 Program Files / LocalAppData 两种安装位置）
-   $edgeExe = "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
-   if (-not (Test-Path $edgeExe)) {
-     $edgeExe = "$env:LOCALAPPDATA\Microsoft\Edge\Application\msedge.exe"
-   }
-   # 用 persistent profile 启动可见 Edge 并打开目标地址
-   Start-Process $edgeExe -ArgumentList @(
-     "--user-data-dir=`"$PROFILE_DIR`"",
-     "$targetUrl"
-   )
+   # --headed：打开可见窗口（非后台无头），用户在里面手动登录
+   playwright-cli open --headed --profile="$PROFILE_DIR" --browser=chromium "$targetUrl"
    ```
+
+   > 该命令直接复用 Playwright 已安装的完整 chromium，无需额外定位 msedge.exe。
 
 3. **提示用户**（明确告知操作步骤）：
 
-   > 已打开可见 Edge 浏览器窗口（复用 persistent profile），请在其中完成以下操作：
+   > 已打开可见 chromium 浏览器窗口（--headed 模式，复用 persistent profile），请在其中完成以下操作：
    >
    > 1. 输入账号 `${TEST_USERNAME}` / 密码 `${TEST_PASSWORD}` 登录
-   > 2. 如遇滑块验证码，手动完成验证
+   > 2. 如遇滑块 / 短信验证码，手动完成验证
    > 3. 确认已成功进入目标页面（URL 不再含 `/login`）
    > 4. **关闭该浏览器窗口**（释放 profile 锁，供 playwright-cli 接管）
    > 5. 回复"继续"
 
 4. **用户确认后**：
    - 确认可见浏览器已关闭（profile 锁释放）
-   - 重新用 `playwright-cli open --profile="$PROFILE_DIR" --browser=msedge "$targetUrl"` 打开页面
+   - 重新用无头模式接管：`playwright-cli open --profile="$PROFILE_DIR" --browser=chromium "$targetUrl"`
    - 重新验证登录态（URL 不含 `/login` → 继续；仍失效 → 终止并报告）
 
 **关键约束**：
 
-- playwright-cli 与手动 Edge **不能同时占用同一 profile 目录**（`__dirlock` 锁冲突）；手动登录前**必须先关闭 playwright-cli 会话**，登录后**必须先关闭手动浏览器**再让 playwright-cli 接管。
+- playwright-cli 与可见 chromium **不能同时占用同一 profile 目录**（`__dirlock` 锁冲突）；手动登录前**必须先关闭无头会话**，登录后**必须先关闭可见浏览器**再让 playwright-cli 无头接管。
+- `--headed` 仅用于"用户手动登录"这一步；常规自动化执行仍用默认无头模式（更快、更稳、不占屏）。
 - 滑块验证码、短信验证码等**只能由用户手动完成**，skill 不尝试自动求解。
 - 账号/密码取 `${ENV_FILE}`（`Tests/.env`），禁止硬编码。
 - 若 persistent profile 损坏（登录后仍失效），可删除 `${PROFILE_DIR}` 重新创建（首启需重新手动登录）。
