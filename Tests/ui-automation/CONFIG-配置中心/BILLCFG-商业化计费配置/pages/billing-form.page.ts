@@ -17,19 +17,39 @@
  *   - §2.1 级联残留菜单干扰 → offsetParent !== null 过滤
  *   - §5.1 删除按钮 testid 为 billing-remove-row-btn-{idx}（非 row-delete）
  */
-import type { Page, Locator } from '@playwright/test';
+import type { Page, Locator, Response } from "@playwright/test";
 import {
   selectElOptionByText,
   selectElOptionByIndex,
   pickCascaderNode,
   pickCascaderMulti,
   pickDateRange,
-} from '../../../helpers/element-plus';
-import { collectErrors } from '../../../helpers/errors';
-import { waitForApi, createCallCounter, type CallCounter } from '../../../helpers/network';
-import { isVisible } from '../../../helpers/visibility';
-import { API_PATTERNS, DEFAULTS } from '../data/billing.data';
-import { VALIDATION_TEXTS, BUTTON_TEXTS, TOAST_TEXTS } from '../data/billing-texts';
+} from "../../../helpers/element-plus";
+import { collectErrors } from "../../../helpers/errors";
+import {
+  waitForApi,
+  createCallCounter,
+  type CallCounter,
+} from "../../../helpers/network";
+import { isVisible } from "../../../helpers/visibility";
+import { API_PATTERNS, DEFAULTS } from "../data/billing.data";
+import {
+  VALIDATION_TEXTS,
+  BUTTON_TEXTS,
+  TOAST_TEXTS,
+} from "../data/billing-texts";
+
+/** submitAndVerify 返回结构，含 3 个维度的判定结果 + 诊断字段。 */
+export interface SubmitResult {
+  /** 接口 retCode == 0（宽松比较，兼容 number 0 / string "0"） */
+  apiOk: boolean;
+  /** toast 文案与 expectedToast 精确匹配 */
+  toastMatched: boolean;
+  /** 实际 toast 文案（失败时诊断用，不臆测） */
+  toastText: string;
+  /** 弹窗是否已关闭 */
+  dialogClosed: boolean;
+}
 
 export class BillingFormPage {
   readonly page: Page;
@@ -44,7 +64,9 @@ export class BillingFormPage {
 
   /** 弹窗根（探索结果：billing-edit-dialog 未命中，回退 .el-dialog）。 */
   get dialog(): Locator {
-    return this.page.locator('[data-testid=billing-edit-dialog], .el-dialog').first();
+    return this.page
+      .locator("[data-testid=billing-edit-dialog], .el-dialog")
+      .first();
   }
 
   /** 弹窗是否可见。 */
@@ -54,7 +76,7 @@ export class BillingFormPage {
 
   /** 等待弹窗可见。 */
   async waitForDialog(timeoutMs = 10_000): Promise<void> {
-    await this.dialog.waitFor({ state: 'visible', timeout: timeoutMs });
+    await this.dialog.waitFor({ state: "visible", timeout: timeoutMs });
     await this.page.waitForTimeout(800);
   }
 
@@ -64,44 +86,44 @@ export class BillingFormPage {
 
   /** 机构名称选择器（el-select）。 */
   get orgSelect(): Locator {
-    return this.page.locator('[data-testid=billing-org-name-select]');
+    return this.page.locator("[data-testid=billing-org-name-select]");
   }
 
   /** 合同编号输入框。 */
   get contractNoInput(): Locator {
-    return this.page.locator('[data-testid=billing-contract-no-input]');
+    return this.page.locator("[data-testid=billing-contract-no-input]");
   }
 
   /** 数据存储期限输入框。 */
   get storageDaysInput(): Locator {
-    return this.page.locator('[data-testid=billing-storage-days-input]');
+    return this.page.locator("[data-testid=billing-storage-days-input]");
   }
 
   /** 文件下载次数输入框（只读，FT-FORM-013）。 */
   get downloadTimesInput(): Locator {
-    return this.page.locator('[data-testid=billing-download-times-input]');
+    return this.page.locator("[data-testid=billing-download-times-input]");
   }
 
   /** 样本分析总次数输入框（只读自动汇总，FT-FORM-014）。 */
   get totalQuotaInput(): Locator {
-    return this.page.locator('[data-testid=billing-total-quota-input]');
+    return this.page.locator("[data-testid=billing-total-quota-input]");
   }
 
   /**
    * 合同周期日期范围选择器（无 testid，兜底定位弹窗内第一个 .el-date-editor）。
    */
   get contractRangeEditor(): Locator {
-    return this.dialog.locator('.el-date-editor').first();
+    return this.dialog.locator(".el-date-editor").first();
   }
 
   /** 选择机构（按文案）。 */
   async selectOrg(name: string): Promise<void> {
-    await selectElOptionByText(this.page, 'billing-org-name-select', name);
+    await selectElOptionByText(this.page, "billing-org-name-select", name);
   }
 
   /** 选择机构第一个选项。 */
   async selectOrgByIndex(index = 0): Promise<void> {
-    await selectElOptionByIndex(this.page, 'billing-org-name-select', index);
+    await selectElOptionByIndex(this.page, "billing-org-name-select", index);
   }
 
   /** 输入合同编号。 */
@@ -147,10 +169,16 @@ export class BillingFormPage {
 
   /** 合同周期是否已填（两个 range-input 均非空）。 */
   async isContractRangeFilled(): Promise<boolean> {
-    const inputs = this.contractRangeEditor.locator('.el-range-input');
-    const start = await inputs.nth(0).inputValue().catch(() => '');
-    const end = await inputs.nth(1).inputValue().catch(() => '');
-    return start !== '' && end !== '';
+    const inputs = this.contractRangeEditor.locator(".el-range-input");
+    const start = await inputs
+      .nth(0)
+      .inputValue()
+      .catch(() => "");
+    const end = await inputs
+      .nth(1)
+      .inputValue()
+      .catch(() => "");
+    return start !== "" && end !== "";
   }
 
   // ============================================================
@@ -159,10 +187,10 @@ export class BillingFormPage {
 
   /** 输入框是否禁用。 */
   async isInputDisabled(locator: Locator): Promise<boolean> {
-    const disabled = await locator.getAttribute('disabled');
+    const disabled = await locator.getAttribute("disabled");
     if (disabled !== null) return true;
-    const cls = (await locator.evaluate((el) => el.className)) || '';
-    return cls.includes('is-disabled');
+    const cls = (await locator.evaluate((el) => el.className)) || "";
+    return cls.includes("is-disabled");
   }
 
   /** 文件下载次数是否只读/禁用（FT-FORM-013）。 */
@@ -188,22 +216,24 @@ export class BillingFormPage {
    * 指定行检测项目套餐级联组件（无 testid，兜底定位弹窗内第 rowIndex 个 .el-cascader）。
    */
   cascaderAt(rowIndex: number): Locator {
-    return this.dialog.locator('.el-cascader').nth(rowIndex);
+    return this.dialog.locator(".el-cascader").nth(rowIndex);
   }
 
   /** "添加一行"按钮。 */
   get addRowButton(): Locator {
-    return this.page.locator('[data-testid=billing-add-row-btn]');
+    return this.page.locator("[data-testid=billing-add-row-btn]");
   }
 
   /** 指定行"删除"按钮（经验 §5.1：billing-remove-row-btn-{idx}）。 */
   removeRowButton(rowIndex: number): Locator {
-    return this.page.locator(`[data-testid=billing-remove-row-btn-${rowIndex}]`);
+    return this.page.locator(
+      `[data-testid=billing-remove-row-btn-${rowIndex}]`,
+    );
   }
 
   /** 当前配额行数（按配额输入框数量）。 */
   async quotaRowCount(): Promise<number> {
-    return this.page.locator('[data-testid^=billing-quota-input-]').count();
+    return this.page.locator("[data-testid^=billing-quota-input-]").count();
   }
 
   /** 输入指定行配额值。 */
@@ -217,6 +247,16 @@ export class BillingFormPage {
   }
 
   /**
+   * 读取指定行已选项目套餐的展示文案（级联 input value）。
+   * 用于 ET-FORM-020 编辑态读取已有行组合，与新增行比较是否同一组合。
+   * 空字符串表示该行未选项目套餐。
+   */
+  async getRowCascaderDisplay(rowIndex: number): Promise<string> {
+    const input = this.cascaderAt(rowIndex).locator("input").first();
+    return input.inputValue().catch(() => "");
+  }
+
+  /**
    * 为指定行选择检测项目套餐（级联单选，默认第一项）。
    * @param rowIndex 配额行索引
    * @param level1Idx 一级菜单索引
@@ -227,7 +267,12 @@ export class BillingFormPage {
     level1Idx = 0,
     level2Idx = 0,
   ): Promise<{ tagCount: number; tagTexts: string[] }> {
-    return pickCascaderNode(this.page, this.cascaderAt(rowIndex), level1Idx, level2Idx);
+    return pickCascaderNode(
+      this.page,
+      this.cascaderAt(rowIndex),
+      level1Idx,
+      level2Idx,
+    );
   }
 
   /**
@@ -255,14 +300,15 @@ export class BillingFormPage {
 
   /** "添加一行"按钮是否禁用（FT-FORM-015 只读态）。 */
   async isAddRowDisabled(): Promise<boolean> {
-    const cls = (await this.addRowButton.getAttribute('class')) || '';
-    return cls.includes('is-disabled');
+    const cls = (await this.addRowButton.getAttribute("class")) || "";
+    return cls.includes("is-disabled");
   }
 
   /** 指定行"删除"按钮是否禁用（FT-FORM-005 仅1行置灰 / FT-FORM-015 只读态）。 */
   async isRemoveRowDisabled(rowIndex: number): Promise<boolean> {
-    const cls = (await this.removeRowButton(rowIndex).getAttribute('class')) || '';
-    return cls.includes('is-disabled');
+    const cls =
+      (await this.removeRowButton(rowIndex).getAttribute("class")) || "";
+    return cls.includes("is-disabled");
   }
 
   // ============================================================
@@ -271,30 +317,129 @@ export class BillingFormPage {
 
   /** "确定"按钮。 */
   get confirmButton(): Locator {
-    return this.page.locator('[data-testid=billing-confirm-btn]');
+    return this.page.locator("[data-testid=billing-confirm-btn]");
   }
 
   /** "取消"按钮。 */
   get cancelButton(): Locator {
-    return this.page.locator('[data-testid=billing-cancel-btn]');
+    return this.page.locator("[data-testid=billing-cancel-btn]");
   }
 
   /** "确定"按钮是否禁用（FT-FORM-007 只读态）。 */
   async isConfirmDisabled(): Promise<boolean> {
-    const cls = (await this.confirmButton.getAttribute('class')) || '';
-    return cls.includes('is-disabled');
+    const cls = (await this.confirmButton.getAttribute("class")) || "";
+    return cls.includes("is-disabled");
   }
 
   /**
    * 点击"确定"提交，等待新增/编辑接口返回。
    * @param mode 'add'|'edit' 决定等待哪个接口
+   * @returns 接口响应（超时或异常返回 null）；调用方可解析 retCode 验证提交结果，
+   *          替代 toast 断言（toast 时机不稳定，FORM-004/006 经验）
    */
-  async clickConfirm(mode: 'add' | 'edit' = 'add'): Promise<void> {
-    const apiPattern = mode === 'add' ? API_PATTERNS.contractAdd : API_PATTERNS.contractEdit;
-    const resp = waitForApi(this.page, { url: apiPattern, method: 'POST' });
+  async clickConfirm(mode: "add" | "edit" = "add"): Promise<Response | null> {
+    const apiPattern =
+      mode === "add" ? API_PATTERNS.contractAdd : API_PATTERNS.contractEdit;
+    const resp = waitForApi(this.page, { url: apiPattern, method: "POST" });
     await this.confirmButton.click();
-    await resp.catch(() => {});
+    const response = await resp.catch(() => null);
     await this.page.waitForTimeout(800);
+    return response;
+  }
+
+  /**
+   * 点击"确定"提交并验证接口返回 retCode===0（替代 toast 断言）。
+   * @param mode 'add'|'edit'
+   * @returns retCode===0 时为 true
+   */
+  async clickConfirmAndVerify(mode: "add" | "edit" = "add"): Promise<boolean> {
+    const resp = await this.clickConfirm(mode);
+    if (!resp) {
+      console.log(`[clickConfirmAndVerify] ${mode} 接口未捕获到响应`);
+      return false;
+    }
+    const status = resp.status();
+    const body = await resp.json().catch(() => null);
+    console.log(
+      `[clickConfirmAndVerify] ${mode} status=${status} body=${JSON.stringify(body)}`,
+    );
+    // retCode 可能是 number 0 或 string "0"，统一用 == 宽松比较
+    return body?.retCode == 0;
+  }
+
+  // ============================================================
+  // 4 维度成功验证（接口 + toast + 弹窗关闭，spec 层补列表/字段变化）
+  // ============================================================
+
+  /**
+   * 点击"确定"提交并并行验证接口 + toast + 弹窗关闭（4 维度的前 3 维度）。
+   *
+   * 采用"先监听后触发"模式：点击前注册 toast + api 两个 Promise，
+   * 点击后 Promise.all 并行等待，避免 ElMessage duration 短导致漏捕获。
+   *
+   * 第 4 维度（列表/字段变化）由 spec 层根据场景补充：
+   * - 新增：用合同编号查询断言能查到
+   * - 编辑：重开编辑弹窗回显值匹配且 ≠ 原始值
+   *
+   * @param mode 'add'|'edit' 决定监听哪个接口
+   * @param expectedToast 期望的成功 toast 文案（取自 TOAST_TEXTS 常量）
+   * @returns 3 个维度的判定结果 + 实际 toast 文案
+   */
+  async submitAndVerify(
+    mode: "add" | "edit",
+    expectedToast: string,
+  ): Promise<SubmitResult> {
+    const apiPattern =
+      mode === "add" ? API_PATTERNS.contractAdd : API_PATTERNS.contractEdit;
+
+    // 提前创建 toast locator 复用，避免 then 内重复查询
+    const toastLocator = this.page
+      .locator(".el-message--success .el-message__content")
+      .first();
+
+    // 1. 点击前注册 toast 监听（.el-message--success 限定成功类型，避免误收错误 toast）
+    const toastPromise = toastLocator
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => toastLocator.textContent())
+      .catch(() => null);
+
+    // 2. 点击前注册接口监听（显式 15s 超时，与边界说明一致）
+    const apiPromise = waitForApi(
+      this.page,
+      { url: apiPattern, method: "POST" },
+      15_000,
+    )
+      .then(async (resp) => ({ body: await resp.json().catch(() => null) }))
+      .catch(() => null);
+
+    // 3. 触发提交
+    await this.confirmButton.click();
+
+    // 4. 并行等待 toast + 接口
+    const [toastText, apiResult] = await Promise.all([
+      toastPromise,
+      apiPromise,
+    ]);
+
+    // 5. 等弹窗关闭动画完成（用 waitFor hidden 替代固定 sleep，比 waitForTimeout 稳定）
+    //    若弹窗未关闭（提交被拒），5s 后超时返回，dialogClosed 判定为 false
+    await this.dialog
+      .waitFor({ state: "hidden", timeout: 5000 })
+      .catch(() => {});
+    const dialogClosed = !(await this.isDialogVisible());
+
+    // 6. 诊断日志（失败时供 error-context.md 参考）
+    const apiOk = apiResult?.body?.retCode == 0;
+    console.log(
+      `[submitAndVerify] ${mode} apiOk=${apiOk} toast="${toastText?.trim() || ""}" expected="${expectedToast}" dialogClosed=${dialogClosed}`,
+    );
+
+    return {
+      apiOk,
+      toastMatched: (toastText?.trim() || "") === expectedToast,
+      toastText: toastText?.trim() || "",
+      dialogClosed,
+    };
   }
 
   /**
@@ -302,9 +447,10 @@ export class BillingFormPage {
    * 返回调用计数器，断言 count===0 表示未调用。
    */
   async clickConfirmOnlyAndCount(
-    mode: 'add' | 'edit' = 'add',
+    mode: "add" | "edit" = "add",
   ): Promise<{ counter: CallCounter; click: () => Promise<void> }> {
-    const pattern = mode === 'add' ? API_PATTERNS.contractAdd : API_PATTERNS.contractEdit;
+    const pattern =
+      mode === "add" ? API_PATTERNS.contractAdd : API_PATTERNS.contractEdit;
     const counter = await createCallCounter(this.page, pattern);
     return {
       counter,
@@ -354,7 +500,7 @@ export class BillingFormPage {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const toasts = await this.page
-        .locator('.el-message__content')
+        .locator(".el-message__content")
         .allTextContents();
       if (toasts.some((t) => t.includes(text))) return true;
       await this.page.waitForTimeout(200);
