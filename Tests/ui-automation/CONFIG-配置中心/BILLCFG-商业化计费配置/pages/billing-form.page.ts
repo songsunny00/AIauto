@@ -347,26 +347,6 @@ export class BillingFormPage {
     return response;
   }
 
-  /**
-   * 点击"确定"提交并验证接口返回 retCode===0（替代 toast 断言）。
-   * @param mode 'add'|'edit'
-   * @returns retCode===0 时为 true
-   */
-  async clickConfirmAndVerify(mode: "add" | "edit" = "add"): Promise<boolean> {
-    const resp = await this.clickConfirm(mode);
-    if (!resp) {
-      console.log(`[clickConfirmAndVerify] ${mode} 接口未捕获到响应`);
-      return false;
-    }
-    const status = resp.status();
-    const body = await resp.json().catch(() => null);
-    console.log(
-      `[clickConfirmAndVerify] ${mode} status=${status} body=${JSON.stringify(body)}`,
-    );
-    // retCode 可能是 number 0 或 string "0"，统一用 == 宽松比较
-    return body?.retCode == 0;
-  }
-
   // ============================================================
   // 4 维度成功验证（接口 + toast + 弹窗关闭，spec 层补列表/字段变化）
   // ============================================================
@@ -486,23 +466,6 @@ export class BillingFormPage {
     while (Date.now() < deadline) {
       const errors = await collectErrors(this.page);
       if (errors.all.some((e) => e.includes(text))) return true;
-      await this.page.waitForTimeout(200);
-    }
-    return false;
-  }
-
-  // ============================================================
-  // Toast 成功消息（FT-FORM-004/006）
-  // ============================================================
-
-  /** 等待成功 toast 出现（新增成功 / 保存成功！）。 */
-  async waitForSuccessToast(text: string, timeoutMs = 5000): Promise<boolean> {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const toasts = await this.page
-        .locator(".el-message__content")
-        .allTextContents();
-      if (toasts.some((t) => t.includes(text))) return true;
       await this.page.waitForTimeout(200);
     }
     return false;
