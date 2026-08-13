@@ -312,7 +312,7 @@ export async function waitForMessageBox(
 ): Promise<boolean> {
   try {
     await page
-      .locator(".el-messagebox")
+      .locator(".el-message-box")
       .first()
       .waitFor({ state: "visible", timeout: timeoutMs });
     return true;
@@ -327,13 +327,13 @@ export async function waitForMessageBox(
  * 升级原因（LIST-010）：原实现用 evaluate 原生 click，在残留 DOM / 事件路径
  * 异常时不触发 Vue handler（快照显示确定按钮 [active] 仍可见）。
  * 现改为：先 waitFor MessageBox 可见（解决时序），再用 Playwright locator click
- * （自动等待可点击 + 真实触发事件），限定在 .el-messagebox 内避免误点对话框同名按钮。
+ * （自动等待可点击 + 真实触发事件），限定在 .el-message-box 内避免误点对话框同名按钮。
  */
 export async function confirmMessageBox(
   page: Page,
   buttonText: string = "确定",
 ): Promise<void> {
-  const box = page.locator(".el-messagebox").first();
+  const box = page.locator(".el-message-box").first();
   await box.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
   await box
     .locator("button")
@@ -355,7 +355,7 @@ export async function cancelMessageBox(page: Page): Promise<void> {
  */
 export async function isMessageBoxVisible(page: Page): Promise<boolean> {
   return page
-    .locator(".el-messagebox")
+    .locator(".el-message-box")
     .first()
     .isVisible()
     .catch(() => false);

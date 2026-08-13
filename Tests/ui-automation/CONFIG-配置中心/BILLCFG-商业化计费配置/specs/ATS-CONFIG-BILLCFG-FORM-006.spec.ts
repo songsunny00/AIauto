@@ -98,8 +98,15 @@ test.describe("3.5 编辑合同配置", () => {
     ).toBe(true);
     expect(result.dialogClosed, `弹窗未关闭`).toBe(true);
 
-    // 字段持久化验证：重新打开编辑弹窗，回显值 = 修改值（≠ 原始值）
+    // 第 5 维度：主表刷新验证——保存后主表对应行的数据存储期限应实时更新为新值
     await billingList.waitForListLoaded();
+    const listStorage = await billingList.getCellText(row, "storageDays");
+    expect(
+      listStorage,
+      `主表未刷新：数据存储期限仍为"${listStorage}"，期望"${newStorage}"`,
+    ).toBe(newStorage);
+
+    // 字段持久化验证：重新打开编辑弹窗，回显值 = 修改值（≠ 原始值）
     await billingList.cleanOverlays();
     await billingList.clickEdit(row);
     await billingForm.waitForDialog();

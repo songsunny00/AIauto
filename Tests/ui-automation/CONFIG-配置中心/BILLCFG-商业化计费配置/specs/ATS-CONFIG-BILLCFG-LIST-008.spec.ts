@@ -10,7 +10,10 @@
  * 数据策略：用 findRowByStatus / findRowByToggleText 自适应定位，数据缺失时 skip。
  */
 import { test, expect } from "../fixtures/billing.fixture";
-import { isMessageBoxVisible } from "../../../helpers/element-plus";
+import {
+  isMessageBoxVisible,
+  cancelMessageBox,
+} from "../../../helpers/element-plus";
 import {
   STATUS_TEXTS,
   STATUS_TAG_TYPE,
@@ -64,14 +67,14 @@ test.describe("3.3 合同状态展示与启停控制", () => {
     await billingList.clickToggleOnly(row);
     expect(await isMessageBoxVisible(authedPage)).toBe(true);
 
-    // 第2步：点击"取消" → 不发起状态变更
+    // 第2步：点击"取消" → 不发起状态变更（直接取消已打开的 MessageBox，不重复点击 toggle）
     const cancelResp = authedPage
       .waitForResponse(
         (r) => r.url().includes("toggle") && r.request().method() === "POST",
         { timeout: 3000 },
       )
       .catch(() => null);
-    await billingList.clickToggle(row, false);
+    await cancelMessageBox(authedPage);
     expect(await cancelResp).toBeNull();
 
     // 第3步+第4步：再次点击"禁用"并确认 → 4 维度验证（接口 + toast + 状态变化 + 按钮切换）

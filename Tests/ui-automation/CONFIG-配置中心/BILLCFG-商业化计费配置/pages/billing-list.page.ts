@@ -405,9 +405,10 @@ export class BillingListPage {
       .then(async (resp) => ({ body: await resp.json().catch(() => null) }))
       .catch(() => null);
 
-    // 3. 触发启停 + 确认 MessageBox
+    // 3. 触发启停 + 确认 MessageBox（先清理残留遮罩，避免 toggle 按钮被遮挡）
+    await this.cleanOverlays();
     await this.toggleButton(rowIndex).click();
-    await waitForMessageBox(this.page, 5000);
+    await waitForMessageBox(this.page, 8000);
     await confirmMessageBox(this.page, BUTTON_TEXTS.confirm);
 
     // 4. 并行等待 toast + 接口
@@ -431,9 +432,10 @@ export class BillingListPage {
 
   /** 仅点击启停按钮弹出确认框（不操作确认框）。 */
   async clickToggleOnly(rowIndex: number): Promise<void> {
+    await this.cleanOverlays();
     await this.toggleButton(rowIndex).click();
     // 等待确认 MessageBox 可见再返回，供 spec 断言 isMessageBoxVisible（LIST-009）
-    await waitForMessageBox(this.page, 5000);
+    await waitForMessageBox(this.page, 8000);
   }
 
   /** 确认 MessageBox 是否可见。 */

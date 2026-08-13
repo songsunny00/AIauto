@@ -11,7 +11,6 @@ export const STATUS_TEXTS = {
   EXPIRING_SOON: "即将到期",
   EXPIRED: "已到期",
   DISABLED: "已停用",
-  TERMINATED: "已终止",
 } as const;
 
 /** Element Plus tag 类型 → 颜色语义（用于状态颜色断言） */
@@ -49,8 +48,8 @@ export const VALIDATION_TEXTS = {
 export const TOAST_TEXTS = {
   addSuccess: "新增成功",
   editSuccess: "保存成功！",
-  disableSuccess: "禁用成功",
-  enableSuccess: "启用成功",
+  disableSuccess: "禁用成功!",
+  enableSuccess: "启用成功!",
 } as const;
 
 /** 行操作按钮文案（FT-LIST-009/010） */

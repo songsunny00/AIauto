@@ -138,17 +138,18 @@ test.describe('3.1 列表查询与默认加载', () => {
     expect(secondCells).toEqual(firstCells);
   });
 
-  // FT-BILLCFG-LIST-013 已终止合同按钮置灰
-  test('FT-BILLCFG-LIST-013 已终止合同：启用/禁用按钮置灰，状态展示"已停用"', async ({ billingList }) => {
-    // 先尝试在当前页找"已终止"，找不到则按"已停用"验证按钮置灰逻辑（数据自适应）
-    let row = await billingList.findRowByStatus(STATUS_TEXTS.TERMINATED);
-    if (row === -1) {
-      row = await billingList.findRowByStatus(STATUS_TEXTS.DISABLED);
-    }
-    test.skip(row === -1, '当前页无已终止/已停用合同，跳过按钮置灰用例');
+  // FT-BILLCFG-LIST-013 已停用合同：操作列显示"启用"按钮（可点击），状态展示"已停用"
+  test('FT-BILLCFG-LIST-013 已停用合同：操作列显示"启用"按钮（蓝色可点击），状态展示"已停用"', async ({ billingList }) => {
+    const row = await billingList.findRowByStatus(STATUS_TEXTS.DISABLED);
+    test.skip(row === -1, '当前页无已停用合同，跳过');
 
+    // 验证状态标签展示"已停用"
+    const status = await billingList.getRowStatus(row);
+    expect(status).toBe(STATUS_TEXTS.DISABLED);
+
+    // 验证操作列显示"启用"按钮（可点击，非 disabled）
     const disabled = await billingList.isToggleDisabled(row);
-    expect(disabled).toBe(true);
+    expect(disabled).toBe(false);
   });
 
   // FT-BILLCFG-LIST-014 已停用且已过期 → 展示"已停用"（红色优先）
