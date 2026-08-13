@@ -69,6 +69,7 @@ skill 内脚本会持续修复 bug 与增强。已建项目如需对齐，对比
 - `global-setup.ts` / `base.fixture.ts`：默认值参数化为读 `.env`（原版硬编码 `CONFIG-配置中心`）
 - `run.mjs`：`--grep` 走 `TEST_GREP` 环境变量通道（绕开 Windows cmd 对 `|` 的管道解析）
 - `helpers/`：含交互经验修复（cascader 浮层关闭 `dismissCascaderPopper` / MessageBox 时序 `waitForMessageBox` / 固定列偏移 `cellIndex` / toast+行内双查 `collectErrors`）
+- `helpers/element-plus.ts`：MessageBox 选择器修正 `.el-messagebox` → `.el-message-box`（Element Plus 实际类名有连字符，原版拼写错误导致 `waitForMessageBox` / `confirmMessageBox` / `cancelMessageBox` / `isMessageBoxVisible` 全部失效，启停类用例 100% 失败）
 
 ## 6. 目录结构与文件清单（参考）
 
