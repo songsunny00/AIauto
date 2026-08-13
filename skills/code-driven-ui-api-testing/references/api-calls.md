@@ -1,6 +1,10 @@
-# 接口调用与验证模板（本项目：omics-web / billingConfig）
+# 接口调用与验证模板（示例产物 · billingConfig 模块）
 
-数据准备（造数）与接口验证共用同一调用。鉴权头为 `omics-vtk`，baseURL 需带 `/api` 前缀。
+> ⚠️ **这是某个实测任务的产物示例，不是通用模板。** 本文件由 `code-driven-ui-api-testing` skill 在具体模块上跑出来的「接口调用 + 验证」参考，仅用于展示产出形态。
+> 正式复用时，应将此类产物沉淀到 **`codeTests/`** 目录（见 SKILL.md §9）；不要把它当作所有模块的通用药方。
+> 不同项目的鉴权头、baseURL、字段结构都不同——每次验证请以「读取待测模块前端源码（api/*.ts、i18n、store）」为准，而非照搬本文。
+
+数据准备（造数）与接口验证共用同一调用。以下以本项目（omics-web / billingConfig）为例：鉴权头为 `omics-vtk`，baseURL 需带 `/api` 前缀。
 
 ## 0.5 Windows / PowerShell 实际可用调用方式（已实测验证）
 

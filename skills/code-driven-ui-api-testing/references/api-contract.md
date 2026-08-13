@@ -1,6 +1,9 @@
-# 接口契约清单（模块：商业化计费配置 billingConfig）
+# 接口契约清单（示例产物 · billingConfig 模块）
 
-> 从 `D:\Codes\omics-web\src\api\config\billingConfig.ts` 与 `src/utils/axios.ts` 提取的真实契约。
+> ⚠️ **这是某个实测任务的产物示例，不是通用模板。** 本文件由 `code-driven-ui-api-testing` skill 读取前端源码后沉淀的「接口契约清单」参考，仅用于展示产出形态。
+> 正式复用时，应将此类产物沉淀到 **`codeTests/`** 目录（见 SKILL.md §9）。不同模块的接口路径/字段完全不同，每次验证请重新读取待测模块源码生成，而非照搬本文。
+
+> 以下为某次实测从 `D:\Codes\omics-web\src\api\config\billingConfig.ts` 与 `src/utils/axios.ts` 提取的真实契约示例：
 > 鉴权头：**`omics-vtk`**（axios 拦截器注入 `config.headers['omics-vtk'] = userInfo.value.token`），非 `Authorization: Bearer`。
 > baseURL：开发态为 `/api`，故完整路径为 `{BASEURL}/api/base/quota/contract/...`（BASEURL=http://ack.omicsone.com）。
 > 响应统一结构：`{ retCode, retInfo, result }`，成功 `retCode==='0'`，业务数据在 `result`。
