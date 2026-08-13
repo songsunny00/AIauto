@@ -11,3 +11,4 @@ Tests/playwright-cli-test/*
 Tests/.env
 Tests/test-reports/*
 Codes/mappings/local-override.yml
+docs/*
