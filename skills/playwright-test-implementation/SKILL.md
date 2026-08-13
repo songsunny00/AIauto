@@ -120,23 +120,70 @@ await expect(errorMessage).toContainText("字母"); // 谨慎
 - 不要把「组件存在」当成「行为正确」。
 - 分页验证**实际翻页行为**；缓存复用验证**请求次数或无重复请求**；汇总统计验证**数值口径**；写操作验证**提交结果 + 页面反馈 + 数据变化**，不只看 toast。
 
-### 8.3 成功类场景推荐组合
+### 8.3 写操作成功验证（4 维度并行捕获）
 
-至少结合以下之一：关键接口响应成功 / 返回体 `retCode === 0` / 弹窗关闭 / 列表内容/状态/计数实际变化。
+写操作（新增/编辑/启停）成功判定必须覆盖 **4 个维度**，捕捉"接口成功但前端展示错误"的场景：
+
+1. **接口 `retCode == 0`**（宽松比较 `==`，兼容 number `0` / string `"0"`）
+2. **toast 文案精确匹配**（从 `data/*-texts.ts` 常量取，不硬编码）
+3. **弹窗/抽屉关闭**
+4. **列表/字段实际变化**（新增→查询能查到；编辑→回显值=修改值且≠原始值；启停→状态列文案变化）
+
+#### 核心模式：先监听后触发（parallel capture）
+
+toast 和接口监听必须在**点击前注册**，点击后 `Promise.all` 并行等待。这是 Playwright 官方推荐模式，无论 ElMessage duration 多短都不会漏。
 
 ```ts
-const [saveResponse] = await Promise.all([
-  page.waitForResponse(
-    (resp) =>
-      resp.url().includes("/base/quota/contract/edit") &&
-      resp.request().method() === "POST",
-    { timeout: 10_000 },
-  ),
-  billingPage.submitForm(),
-]);
-expect(saveResponse.ok()).toBeTruthy();
-expect((await saveResponse.json()).retCode).toBe(0);
-await billingPage.expectToast("保存成功");
+// ❌ 错误：点击后再查 toast，ElMessage 可能已消失
+await confirmButton.click();
+await expect(page.locator(".el-message__content")).toHaveText("保存成功");
+
+// ✅ 正确：点击前注册 toast + api 两个并行监听
+const toastLocator = page
+  .locator(".el-message--success .el-message__content")
+  .first();
+const toastPromise = toastLocator
+  .waitFor({ state: "visible", timeout: 5000 })
+  .then(() => toastLocator.textContent())
+  .catch(() => null);
+const apiPromise = waitForApi(page, { url: apiPattern, method: "POST" })
+  .then(async (resp) => ({ body: await resp.json().catch(() => null) }))
+  .catch(() => null);
+
+await confirmButton.click(); // 触发提交
+const [toastText, apiResult] = await Promise.all([toastPromise, apiPromise]);
+```
+
+#### ElMessage 类型区分
+
+Element Plus 的 ElMessage 无论 success/error/warning 类型，文案都在 `.el-message__content`，区别只是父级修饰类。成功 toast 监听**必须用 `.el-message--success .el-message__content`** 限定类型，否则会把错误提示误当成功。
+
+#### 断言分写 + 结构化消息
+
+每条 `expect` 独立断言一个维度，消息模板统一格式 `期望="..." 实际="..."`，失败时一眼定位哪个维度挂了：
+
+```ts
+expect(result.apiOk, `新增接口失败：retCode 非 0`).toBe(true);
+expect(
+  result.toastMatched,
+  `toast 文案不匹配，期望="${TOAST_TEXTS.addSuccess}" 实际="${result.toastText}"`,
+).toBe(true);
+expect(result.dialogClosed, `弹窗未关闭`).toBe(true);
+// 第 4 维度在 spec 层独立断言（查询列表 / 回显验证 / 状态变化）
+```
+
+#### 编辑场景补充：自适应目标值 + 回显断言
+
+修改型场景必须确保形成**真实变更**。记录编辑前值，自适应选择不同目标值（避免写回原值），保存后重开弹窗验证回显：
+
+```ts
+const before = await page.inputValue(storageInput);
+const target = before === "120" ? "180" : "120"; // 自适应避免写回原值
+await storageInput.fill(target);
+// ... submitAndVerify ...
+// 保存后重开编辑弹窗，回显值 = 修改值且 ≠ 原始值
+expect(await page.inputValue(storageInput)).toBe(target);
+expect(await page.inputValue(storageInput)).not.toBe(before);
 ```
 
 > 网络等待 / mock / 调用计数优先用 `helpers/network.ts`（`waitForApi` / `createCallCounter`），详见 `reference/helpers-api.md` §3。
@@ -166,6 +213,8 @@ await billingPage.expectToast("保存成功");
 - 禁止每条用例单独登录；禁止硬编码环境地址、账号、密码。
 - 禁止优先用脆弱 CSS class / 纯文本定位，明明有 `data-testid` 还不用。
 - 禁止把 `networkidle` 当主要等待手段；禁止把 toast 作为唯一成功依据。
+- **禁止点击后再查 toast**（ElMessage 默认 duration 3000ms，点击后注册监听可能已消失）；toast 监听必须在**点击前注册**（"先监听后触发"模式，详见 §8.3）。
+- **禁止用 `.el-message__content` 不限定类型监听成功 toast**：ElMessage 的 success/error/warning 共用此 class，必须用 `.el-message--success .el-message__content` 限定，否则会把错误提示误当成功。
 - 禁止在需求文案已明确时，仅用关键词包含断言替代完整文案断言。
 - 禁止用「组件存在」「字段存在」冒充「行为已验证」。
 - 禁止在未确认数据条件时强行让用例失败，应显式 `test.skip(reason)`；禁止通过静态假设直接 skip。
@@ -256,10 +305,10 @@ node gen-report.mjs --domain <一级模块> [--module <二级模块>] --ai
 
 ## 15. 参考文件索引
 
-| 文件                                                | 用途                                  | 加载时机                         |
-| --------------------------------------------------- | ------------------------------------- | -------------------------------- |
-| `reference/helpers-api.md`                          | helpers / fixture 用法速查            | 写表单/弹窗/列表/网络/错误断言时 |
-| `reference/failure-attribution.md`                  | 五类失败归因详解 + 请求四态           | 失败修复 / AI 报告归因时         |
-| `reference/self-check.md`                           | 完成前自检清单（7 大类）              | 提交 / 回归前                    |
+| 文件                                     | 用途                                  | 加载时机                         |
+| ---------------------------------------- | ------------------------------------- | -------------------------------- |
+| `reference/helpers-api.md`               | helpers / fixture 用法速查            | 写表单/弹窗/列表/网络/错误断言时 |
+| `reference/failure-attribution.md`       | 五类失败归因详解 + 请求四态           | 失败修复 / AI 报告归因时         |
+| `reference/self-check.md`                | 完成前自检清单（7 大类）              | 提交 / 回归前                    |
 | `Tests/ui-automation/report-template.md` | AI 回归报告骨架模板（bootstrap 复制） | 执行完测试生成报告时             |
-| `ui-automation-bootstrap` skill                     | 目录骨架 / 标准脚本 / helpers 源      | 新项目缺脚本或 helpers 时        |
+| `ui-automation-bootstrap` skill          | 目录骨架 / 标准脚本 / helpers 源      | 新项目缺脚本或 helpers 时        |
