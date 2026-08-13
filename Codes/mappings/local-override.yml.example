@@ -1,0 +1,7 @@
+# 复制本文件为 local-override.yml，填入你的本地 clone 路径
+# local-override.yml 已被 .gitignore 排除，不会提交
+# 键对应 prd-to-code.yaml 中的 repo_registry 别名
+# 值为本地 clone 根目录（不含 repo_path）
+repos:
+  "repos/frontend-repo": "D:/your/path/to/omics-web"
+  # "repos/backend-repo": "D:/your/path/to/omics-backend"
