@@ -21,9 +21,12 @@ export function waitForApi(
 ): Promise<Response> {
   return page.waitForResponse(
     (res) => {
+      // 字符串模式：去除 glob 通配符（** 和 *）后做 includes 子串匹配。
+      // API_PATTERNS 中的 URL 含 **（供 page.route 使用），但 includes 不识别 glob，
+      // 必须先 strip 否则永远匹配不上（FORM-004/006/008 失败根因）。
       const urlMatch =
         typeof matcher.url === "string"
-          ? res.url().includes(matcher.url)
+          ? res.url().includes(matcher.url.replace(/\*/g, ""))
           : matcher.url.test(res.url());
       const methodMatch =
         !matcher.method || res.request().method() === matcher.method;

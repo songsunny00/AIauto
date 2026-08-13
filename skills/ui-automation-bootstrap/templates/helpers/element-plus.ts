@@ -209,17 +209,30 @@ async function getCascaderTags(
  * 收起 el-cascader 浮层（选完节点后调用，避免 popper 拦截后续点击）。
  *
  * 经验 §2.1 升级：单选选中末级后浮层通常自动关闭，但 checkStrictly / 多选模式下
- * 浮层保持展开，会拦截确定按钮的点击（FORM-004：el-popper-container 拦截 confirmButton）。
+ * 浮层保持展开，会拦截确定按钮的点击（FORM-004/008、ET-019：el-popper-container 拦截
+ * confirmButton / removeRowButton）。
  *
- * 策略：向 body 派发 pointerdown/mousedown 事件，触发 el-cascader 的 onClickOutside
- * 关闭浮层。不点击任何真实元素，无副作用（不会误触按钮、不会关闭对话框）。
+ * 策略：向 body 派发完整指针事件序列（pointerdown→pointerup + mousedown→mouseup→click），
+ * 触发 el-cascader 的 onClickOutside 关闭浮层。
+ *
+ * 关键修复（2026-08-10 ET-019 调试）：原实现仅派发 pointerdown + mousedown，但
+ * element-plus 的 clickoutside（基于 @vueuse/core 的 onClickOutside）需要 pointerdown +
+ * pointerup 配对（或 mousedown + mouseup + click）才判定为完整外部点击。缺少配对的
+ * up/click 事件导致浮层不关闭。补充完整序列后浮层正常收起。
+ *
+ * 不点击任何真实元素，无副作用（不会误触按钮、不会关闭对话框）。
  * 相比按 Escape（可能触发 el-dialog 的 closeOnPressEscape 关闭对话框），更安全。
  */
 async function dismissCascaderPopper(page: Page): Promise<void> {
   await page.evaluate(() => {
-    const opts = { bubbles: true, cancelable: true };
+    const opts = { bubbles: true, cancelable: true, view: window };
+    // PointerEvent 序列（现代浏览器优先路径）
     document.body.dispatchEvent(new PointerEvent("pointerdown", opts));
+    document.body.dispatchEvent(new PointerEvent("pointerup", opts));
+    // MouseEvent 序列（兜底 + clickoutside 的 click 判定）
     document.body.dispatchEvent(new MouseEvent("mousedown", opts));
+    document.body.dispatchEvent(new MouseEvent("mouseup", opts));
+    document.body.dispatchEvent(new MouseEvent("click", opts));
   });
   await page.waitForTimeout(300);
 }
