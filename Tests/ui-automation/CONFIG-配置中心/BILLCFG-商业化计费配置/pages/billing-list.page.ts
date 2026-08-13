@@ -363,6 +363,72 @@ export class BillingListPage {
     }
   }
 
+  /**
+   * 点击启停按钮 + 确认 MessageBox，并行验证接口 + toast（4 维度的前 3 维度）。
+   *
+   * 与 BillingFormPage.submitAndVerify 同模式："先监听后触发"：
+   * 点击前注册 toast + api 两个 Promise，确认 MessageBox 后 Promise.all。
+   *
+   * 第 4 维度（状态变化）由 spec 层断言：
+   * - 禁用：getRowStatus → 已停用，按钮文案 → 启用
+   * - 启用：getRowStatus → 正常/即将到期/已到期，按钮文案 → 禁用
+   *
+   * @param rowIndex 目标行索引
+   * @param expectedToast 期望的成功 toast 文案（TOAST_TEXTS.disableSuccess / enableSuccess）
+   * @returns 3 个维度的判定结果 + 实际 toast 文案
+   */
+  async toggleAndVerify(
+    rowIndex: number,
+    expectedToast: string,
+  ): Promise<{
+    apiOk: boolean;
+    toastMatched: boolean;
+    toastText: string;
+  }> {
+    // 提前创建 toast locator 复用
+    const toastLocator = this.page
+      .locator(".el-message--success .el-message__content")
+      .first();
+
+    // 1. 点击前注册 toast 监听
+    const toastPromise = toastLocator
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => toastLocator.textContent())
+      .catch(() => null);
+
+    // 2. 点击前注册接口监听
+    const apiPromise = waitForApi(
+      this.page,
+      { url: API_PATTERNS.contractToggle, method: "POST" },
+      15_000,
+    )
+      .then(async (resp) => ({ body: await resp.json().catch(() => null) }))
+      .catch(() => null);
+
+    // 3. 触发启停 + 确认 MessageBox
+    await this.toggleButton(rowIndex).click();
+    await waitForMessageBox(this.page, 5000);
+    await confirmMessageBox(this.page, BUTTON_TEXTS.confirm);
+
+    // 4. 并行等待 toast + 接口
+    const [toastText, apiResult] = await Promise.all([
+      toastPromise,
+      apiPromise,
+    ]);
+
+    // 5. 诊断日志
+    const apiOk = apiResult?.body?.retCode == 0;
+    console.log(
+      `[toggleAndVerify] apiOk=${apiOk} toast="${toastText?.trim() || ""}" expected="${expectedToast}"`,
+    );
+
+    return {
+      apiOk,
+      toastMatched: (toastText?.trim() || "") === expectedToast,
+      toastText: toastText?.trim() || "",
+    };
+  }
+
   /** 仅点击启停按钮弹出确认框（不操作确认框）。 */
   async clickToggleOnly(rowIndex: number): Promise<void> {
     await this.toggleButton(rowIndex).click();

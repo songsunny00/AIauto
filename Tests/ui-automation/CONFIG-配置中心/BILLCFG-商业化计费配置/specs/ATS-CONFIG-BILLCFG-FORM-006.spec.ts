@@ -164,17 +164,24 @@ test.describe("3.5 编辑合同配置", () => {
     await billingForm.pickRowProjectProduct(lastIdx, 0, 0);
     await billingForm.inputQuota(lastIdx, "88");
 
-    // 保存：用接口 retCode===0 验证（toast 时机不稳定）
-    const saved = await billingForm.clickConfirmAndVerify("edit");
-    expect(saved, "编辑接口未返回 retCode===0").toBe(true);
+    // 4 维度断言：接口 + toast + 弹窗关闭
+    const result = await billingForm.submitAndVerify(
+      "edit",
+      TOAST_TEXTS.editSuccess,
+    );
+    expect(result.apiOk, `编辑接口失败：retCode 非 0`).toBe(true);
+    expect(
+      result.toastMatched,
+      `toast 文案不匹配，期望="${TOAST_TEXTS.editSuccess}" 实际="${result.toastText}"`,
+    ).toBe(true);
+    expect(result.dialogClosed, `弹窗未关闭`).toBe(true);
 
-    // 再次打开编辑回显
+    // 字段持久化验证：重新打开编辑弹窗，新增行配额回显正确
     await billingList.waitForListLoaded();
     await billingList.cleanOverlays();
     await billingList.clickEdit(row);
     await billingForm.waitForDialog();
 
-    // 新增行正确保存（最后一行配额为 88）
     const echoedQuota = await billingForm.getQuota(lastIdx);
     expect(echoedQuota).toBe("88");
     void beforeQuota;
