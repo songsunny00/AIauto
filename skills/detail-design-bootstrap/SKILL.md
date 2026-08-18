@@ -149,7 +149,6 @@ Step 4: 输出「REQ ↔ 接口 ↔ 调用处映射表」给用户确认
 - ❌ 不修改 `01-需求文档.md`（偏差只在证据表记录，由人走变更流程）。
 - ❌ 不修改 `02b-后台文档.md`。
 - ❌ 不修改前端代码。
-- ❌ 不替代 `requirement-analysis` 的影响分析能力。
 - ❌ 不替代 `testcase-generation` 生成 `03-测试用例文档.md`。
 - ❌ 不生成 Playwright/UI 自动化脚本（由 `ui-automation-bootstrap` / `playwright-test-implementation` 负责）。
 - ❌ 不处理图片素材（详设一般不含图）。
@@ -160,7 +159,6 @@ Step 4: 输出「REQ ↔ 接口 ↔ 调用处映射表」给用户确认
 | 已有 Skill | 边界 |
 | --- | --- |
 | `requirement-doc-bootstrap` | 生成 01；本 Skill 仅消费 01，不生成 01 |
-| `requirement-analysis` | 做需求结构化与影响分析；本 Skill 不做影响分析，仅在内部抽取 REQ 清单用于详设结构化 |
 | `testcase-generation` | 生成 03；本 Skill 仅生成 02，不写测试用例 |
 | `ui-automation-bootstrap` | 生成 UI 自动化骨架；本 Skill 不生成任何自动化代码 |
 | `playwright-test-implementation` | 实现 Playwright 脚本；本 Skill 不涉及 |

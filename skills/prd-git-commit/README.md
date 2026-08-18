@@ -171,7 +171,6 @@ markdown 格式，包含：变更摘要、变更详情（文件/REQ/类型/变�
 本技能是第一批最小闭环 skills 之后的补充能力：
 
 - `requirement-doc-bootstrap` 生成 `01-需求文档.md` 初稿
-- `requirement-analysis` 解析需求抽取 REQ 清单
 - **`prd-git-commit`** 负责将需求文档变更提交到 Git 并通知团队
 
 本技能仅处理 `Prds/` 目录下的文档提交，不处理 `Codes/`、`Tests/` 目录的代码提交。
