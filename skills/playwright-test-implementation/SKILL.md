@@ -194,6 +194,42 @@ expect(await page.inputValue(storageInput)).not.toBe(before);
 - 对依赖基础信息的校验用例，先确认基础字段已成功填写，再触发目标校验分支。
 - 按钮应置灰时优先断言 disabled，不要 `force: true` 掩盖问题。
 
+### 8.5 用例预期结果字段级覆盖（防「用例有、脚本没测」）
+
+**问题模式**：`03` 用例「预期结果」逐字列出某表/区块应包含的字段/列/文案（如下载记录表的必需列、存储区块「增值存储总容量」标签），脚本却只断言弱代理量（`行数 >= 0`、`卡片可见`、`存在某元素`），导致前端**漏渲染该列**或**文案写错**时用例仍通过——「用例有要求、脚本没测」。
+
+**规则**：`03` 预期结果逐字列出的字段名/列名/文案，脚本必须对每一项有对应断言，不得用「行数」「可见性」「存在」代理替代。
+
+- 表格列：读表头 `th .cell` 文案，断言包含每个必需列名（空表时表头仍渲染，不依赖行数）；列名收敛到 `data/*-texts.ts` 常量数组遍历断言，不硬编码具体列名（列名随需求版本变动时只改常量）。
+- 区块字段标签：读 `.field-label` 文案，断言包含每个必需标签。
+- 文案：用 `data/*-texts.ts` 常量精确匹配（遵循 §8.1）。
+
+```ts
+// ❌ 仅断言行数：前端漏渲染必需列时用例不失败
+expect(await detail.downloadRecordRowCount()).toBeGreaterThanOrEqual(0);
+
+// ✅ 读表头逐列断言（空表表头仍渲染，列名收敛到常量数组）
+const headers = await detail.downloadRecordHeaders();
+for (const col of DETAIL_DRAWER_TEXTS.downloadRequiredColumns) {
+  expect(
+    headers.some((h) => h.includes(col)),
+    `缺"${col}"列：${headers.join("/")}`,
+  ).toBe(true);
+}
+
+// ❌ 仅断言卡片可见：前端把"增值存储总容量"误写为"增值存储容量"时用例不失败
+expect(await detail.isStorageCardVisible()).toBe(true);
+
+// ✅ 读字段标签精确断言（"增值存储容量"不含"增值存储总容量"，漏"总"字即失败）
+const labels = await detail.getStorageCardFieldLabels();
+expect(
+  labels.some((l) => l.includes("增值存储总容量")),
+  `缺"增值存储总容量"标签：${labels.join("/")}`,
+).toBe(true);
+```
+
+> 条件展示区块（`v-if`）：用例前置条件不保证可见时用 `if (await isVisible(block)) { 逐项断言 }`；前置条件已保证（如「已开通增值存储的租户」）则硬断言。
+
 ## 9. 版本迭代维护规则
 
 - 增量需求优先修改现有 `spec/page/data`，不要为同一页面平行再造一套脚本。
@@ -217,6 +253,7 @@ expect(await page.inputValue(storageInput)).not.toBe(before);
 - **禁止用 `.el-message__content` 不限定类型监听成功 toast**：ElMessage 的 success/error/warning 共用此 class，必须用 `.el-message--success .el-message__content` 限定，否则会把错误提示误当成功。
 - 禁止在需求文案已明确时，仅用关键词包含断言替代完整文案断言。
 - 禁止用「组件存在」「字段存在」冒充「行为已验证」。
+- **禁止用「行数≥0」「卡片可见」「元素存在」代理替代 `03` 预期结果逐字列出的字段/列/文案断言**：前端漏渲染该列或文案写错时用例不失败（「用例有、脚本没测」）。表格列读表头断言、区块字段读标签断言、文案用常量精确匹配（详见 §8.5）。
 - 禁止在未确认数据条件时强行让用例失败，应显式 `test.skip(reason)`；禁止通过静态假设直接 skip。
 - 禁止通过 `force: true` 掩盖本应 disabled / hidden / 不可提交的问题。
 - 禁止脱离页面实际数据凭空编写机构、项目、状态和合同数据；禁止让写操作残留数据无控制地污染后续用例。

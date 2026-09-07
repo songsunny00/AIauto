@@ -11,6 +11,13 @@
       "sourceType": "github",
       "skillPath": "skills/skill-creator/SKILL.md",
       "computedHash": "7e3c9cd74e9e2b4828527a857170e86310f2dab5ea8030a9043df2c7e6c88857"
+    },
+    "skill-upper": {
+      "source": "alibaba/skill-up",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "skills/skill-upper/SKILL.md",
+      "computedHash": "eae92395d6f3b0a70fd6366955186bb2689eff252cbb3d3d02dce9ed6d510a2c"
     }
   }
 }

@@ -2,7 +2,7 @@
 
 > ⚠️ **这是某个实测任务的产物示例，不是通用模板。** 本文件由 `code-driven-ui-api-testing` skill 在具体模块上跑出来的「接口调用 + 验证」参考，仅用于展示产出形态。
 > 正式复用时，应将此类产物沉淀到 **`codeTests/`** 目录（见 SKILL.md §9）；不要把它当作所有模块的通用药方。
-> 不同项目的鉴权头、baseURL、字段结构都不同——每次验证请以「读取待测模块前端源码（api/*.ts、i18n、store）」为准，而非照搬本文。
+> 不同项目的鉴权头、baseURL、字段结构都不同——每次验证请以「读取待测模块前端源码（api/\*.ts、i18n、store）」为准，而非照搬本文。
 
 数据准备（造数）与接口验证共用同一调用。以下以本项目（omics-web / billingConfig）为例：鉴权头为 `omics-vtk`，baseURL 需带 `/api` 前缀。
 
@@ -13,7 +13,7 @@
 ```powershell
 # token 仅放环境变量，绝不写进脚本/仓库
 $env:TEST_TOKEN = "<用户提供的 token>"
-$B = "http://ack.omicsone.com/api"
+$B = "http://omicsone-cloud-test.bgi.com/api"
 $h = @{"omics-vtk" = $env:TEST_TOKEN; "lang" = "zh_CN"}
 
 # 读接口（验证 token + 造数前取真实枚举）
@@ -47,6 +47,7 @@ $t.retCode          # 期望 0
 ```
 
 ### 实测事实（2026-07-21 billingConfig 模块）
+
 - 接口全部可达，`retCode===0` 即成功；`retCode===201` 表示 token 失效。
 - `contract/page`：`pageSize` 默认 10，当前共 47 条 / 5 页 → **翻页（LIST-011）用存量数据即可测，非百条级**，不要误判为"数据不足"。
 - 本模块**只有启停（`toggle`）、无删除接口**；新增数据清理走"禁用软清理"。**约束4 当前无删除操作可触发**；若未来接入删除接口，必须仅删本次新增数据。
@@ -63,29 +64,33 @@ export TEST_TOKEN="$TOKEN"
 # 方式 B：用户直接提供
 export TEST_TOKEN="<用户提供的 token>"
 ```
+
 验证 token 有效（读接口，无写入）：
+
 ```bash
-curl -s -X POST "http://ack.omicsone.com/api/base/quota/contract/page" \
+curl -s -X POST "http://omicsone-cloud-test.bgi.com/api/base/quota/contract/page" \
   -H "omics-vtk: $TEST_TOKEN" -H "Content-Type: application/json" \
   -d '{"pageNum":1,"pageSize":10}' | jq '{retCode, total: .result.total}'
 ```
 
 ## 1. 取真实枚举（造数前必做，只读）
+
 ```bash
-INST=$(curl -s -X POST "http://ack.omicsone.com/api/base/authInstitution/pageInstitutions" \
+INST=$(curl -s -X POST "http://omicsone-cloud-test.bgi.com/api/base/authInstitution/pageInstitutions" \
   -H "omics-vtk: $TEST_TOKEN" -H "Content-Type: application/json" -d '{"pageNum":1,"pageSize":1000}' \
   | jq -r '.result.records[0].instCode')
-PROJ=$(curl -s -X POST "http://ack.omicsone.com/api/base/projects/page" \
+PROJ=$(curl -s -X POST "http://omicsone-cloud-test.bgi.com/api/base/projects/page" \
   -H "omics-vtk: $TEST_TOKEN" -H "Content-Type: application/json" -d '{"pageNum":1,"pageSize":1000}' \
   | jq -r '.result.records[0].projectCode')
-PROD=$(curl -s -X POST "http://ack.omicsone.com/api/base/products/page" \
+PROD=$(curl -s -X POST "http://omicsone-cloud-test.bgi.com/api/base/products/page" \
   -H "omics-vtk: $TEST_TOKEN" -H "Content-Type: application/json" -d '{"pageNum":1,"pageSize":1000}' \
   | jq -r '.result.records[] | select(.projectCode=="'$PROJ'") | .productNo' | head -1)
 ```
 
 ## 2. 写接口：新增合同（造数 + 验证合一）
+
 ```bash
-RESP=$(curl -s -X POST "http://ack.omicsone.com/api/base/quota/contract/add" \
+RESP=$(curl -s -X POST "http://omicsone-cloud-test.bgi.com/api/base/quota/contract/add" \
   -H "omics-vtk: $TEST_TOKEN" -H "Content-Type: application/json" \
   -d "{
     \"contractNo\": \"HT-T-001\",
@@ -99,11 +104,13 @@ RESP=$(curl -s -X POST "http://ack.omicsone.com/api/base/quota/contract/add" \
   }")
 echo "$RESP" | jq '{retCode, contractId: .result}'
 ```
+
 断言：`retCode==='0'` 且 `result` 含新 `contractId` → 造数成功 + add 接口验证通过。记录 `contractId` 到数据清单。
 
 ## 3. 编辑复用（同一条数据）
+
 ```bash
-curl -s -X POST "http://ack.omicsone.com/api/base/quota/contract/edit" \
+curl -s -X POST "http://omicsone-cloud-test.bgi.com/api/base/quota/contract/edit" \
   -H "omics-vtk: $TEST_TOKEN" -H "Content-Type: application/json" \
   -d "{
     \"contractId\": <NEW_ID>,
@@ -116,16 +123,20 @@ curl -s -X POST "http://ack.omicsone.com/api/base/quota/contract/edit" \
     \"lines\": [{\"coverages\": [{\"productNo\": \"$PROD\", \"projectCode\": \"$PROJ\"}], \"sampleQuota\": 120}]
   }" | jq '{retCode, result}'
 ```
+
 断言：`retCode==='0'`、`result=true` → 编辑接口验证通过，且复用同一条数据（约束3）。
 
 ## 4. 软清理（本模块无删除接口）
+
 ```bash
-curl -s -X POST "http://ack.omicsone.com/api/base/quota/contract/toggle/<NEW_ID>/DISABLED" \
+curl -s -X POST "http://omicsone-cloud-test.bgi.com/api/base/quota/contract/toggle/<NEW_ID>/DISABLED" \
   -H "omics-vtk: $TEST_TOKEN" | jq '{retCode, result}'
 ```
+
 说明：本模块只有启停、无删除，新增数据清理走"禁用软清理"或保留（≤5 条）。**若未来接入删除接口，必须仅删本次新增数据**（约束4）。
 
 ## 5. 注意事项
+
 - 单次运行新增 ≤ 10 条（约束1）。
 - 入参枚举（instCode/productNo/projectCode）必须从步骤1取真实值，禁止编造。
 - 调用结果（retCode/错误码/返回字段）必须进入报告接口验证明细。

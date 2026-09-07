@@ -76,12 +76,12 @@ $targetUrl = "http://localhost:7001/config/billingConfig"  # 从 03-测试用例
 playwright-cli open --profile="$PROFILE_DIR" --browser=chromium $targetUrl
 
 # ❌ 禁止：硬编码地址（含从历史会话/记忆取）
-playwright-cli open http://ack.omicsone.com/config/billingConfig
+playwright-cli open http://omicsone-cloud-test.bgi.com/config/billingConfig
 # ❌ 禁止：自行拼接 TEST_BASE_URL + 路由
 $targetUrl = "$baseUrl/config/billingConfig"
 ```
 
-> **教训记录**：曾因 SKILL 示例写死 `ack.omicsone.com`、且自行拼接地址，导致测试在错误环境执行。现改为地址直接取自测试文档，不明确则询问用户。
+> **教训记录**：曾因 SKILL 示例写死 `omicsone-cloud-test.bgi.com`、且自行拼接地址，导致测试在错误环境执行。现改为地址直接取自测试文档，不明确则询问用户。
 
 ---
 
@@ -91,11 +91,11 @@ $targetUrl = "$baseUrl/config/billingConfig"
 
 ### 2.5.1 依赖清单
 
-| 依赖 | 用途 | 版本要求 | 检查命令 |
-|---|---|---|---|
-| Node.js + npm | 运行 playwright-cli（npm 全局包） | Node ≥ 18 LTS | `node -v` / `npm -v` |
-| @playwright/cli（playwright-cli） | 浏览器自动化驱动 | 最新稳定版 | `playwright-cli --version` |
-| Playwright 完整 chromium（GUI 版） | 支撑 `--profile`（persistent）与 `--headed` 登录；`chromium_headless_shell` 不足以持久化 | 随 playwright-cli 安装 | 见 §2.5.2 |
+| 依赖                               | 用途                                                                                     | 版本要求               | 检查命令                   |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------- | -------------------------- |
+| Node.js + npm                      | 运行 playwright-cli（npm 全局包）                                                        | Node ≥ 18 LTS          | `node -v` / `npm -v`       |
+| @playwright/cli（playwright-cli）  | 浏览器自动化驱动                                                                         | 最新稳定版             | `playwright-cli --version` |
+| Playwright 完整 chromium（GUI 版） | 支撑 `--profile`（persistent）与 `--headed` 登录；`chromium_headless_shell` 不足以持久化 | 随 playwright-cli 安装 | 见 §2.5.2                  |
 
 > **关键说明**：`--profile`（persistent / `launchPersistentContext`）需要**完整 GUI chromium**，`chromium_headless_shell` 无法承载持久化上下文。必须用 `playwright install chromium` 安装完整版（不是仅 headless shell）。本机 `ms-playwright/chromium-*` 目录存在即表示已装。
 
@@ -119,9 +119,10 @@ playwright-cli install chromium
 若检测到依赖缺失，主动提示用户并等待安装完成，**不要静默继续**：
 
 > ⚠️ 检测到 `[xxx]` 未安装。请先执行以下命令安装后再继续测试：
+>
 > 1. `npm install -g @playwright/cli@latest`
 > 2. `playwright-cli install chromium`
-> 安装完成后回复"已安装"，我再继续。
+>    安装完成后回复"已安装"，我再继续。
 
 ---
 
@@ -131,8 +132,8 @@ playwright-cli install chromium
 2. 输出含版本警告框（skill 与 tool 不匹配）→ 执行 `playwright-cli install --skills=agents`（exit code 可能非 0 但实际成功）；输出干净则跳过。
 3. 按 §2.1 解析路径变量；确认 `PROFILE_DIR` 目录存在（首启自动创建，首次需手动登录一次），长期复用。
 4. 确认 Playwright 完整 chromium 已安装（见 §2.5）；缺失则先 `playwright-cli install chromium` 再继续。
-4. 确认 `${ENV_FILE}`（`Tests/.env`）含 `TEST_BASE_URL`、`TEST_USERNAME`、`TEST_PASSWORD`；目标地址按 §2.2 直接取自测试用例文档 §2.1 完整前端入口（不拼接，不明确则询问用户）。
-5. 确认 `03-测试用例文档.md`（FT-\* 来源）与模块 `data-testid.snapshot.json`、`02-详细设计文档.md` §7 是否就绪。
+5. 确认 `${ENV_FILE}`（`Tests/.env`）含 `TEST_BASE_URL`、`TEST_USERNAME`、`TEST_PASSWORD`；目标地址按 §2.2 直接取自测试用例文档 §2.1 完整前端入口（不拼接，不明确则询问用户）。
+6. 确认 `03-测试用例文档.md`（FT-\* 来源）与模块 `data-testid.snapshot.json`、`02-详细设计文档.md` §7 是否就绪。
 
 ---
 
